@@ -1,0 +1,7 @@
+fastapi
+snowflake-connector-python
+snowflake
+snowflake-ml-python
+python-dotenv
+magentic
+sse-starlette

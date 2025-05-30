@@ -1,0 +1,4 @@
+CREATE ROLE cortex_user_role;
+GRANT DATABASE ROLE SNOWFLAKE.CORTEX_USER TO ROLE cortex_user_role;
+
+GRANT ROLE cortex_user_role TO USER {YOUR_USERNAME};

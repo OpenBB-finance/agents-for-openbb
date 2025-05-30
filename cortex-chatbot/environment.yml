@@ -1,0 +1,16 @@
+name: cortex-env
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.11
+  - snowflake-ml-python
+  - snowflake-connector-python
+  - pip
+  - pip:
+    - fastapi
+    - snowflake
+    - python-dotenv
+    - magentic
+    - sse-starlette
+    - uvicorn

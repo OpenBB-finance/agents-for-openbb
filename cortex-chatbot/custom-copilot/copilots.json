@@ -1,0 +1,13 @@
+{
+	"snowflake_cortex": {
+		"name": "Snowflake Cortex",
+		"description": "Tutorial Chatbot for FOMC minutes in Snowflake Search.",
+		"image": "https://www.celigo.com/wp-content/uploads/2022/11/snowflake-brandmark.png",
+		"hasStreaming": true,
+		"hasDocuments": true,
+        "hasFunctionCalling": false,
+		"endpoints": {
+			"query": "http://127.0.0.1:7777/v1/query"
+		}
+	}
+}

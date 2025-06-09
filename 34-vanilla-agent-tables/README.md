@@ -1,44 +1,8 @@
-# Agent that can produce tables
+# Example agent that can produce tables
 
 This is an example agent, powered by OpenAI, that can perform question answering
 and can return tables as part of its response. These tables are then rendered by
 the OpenBB Workspace.
-
-## Architecture
-
-```sh
-┌─────────────────────┐                ┌─────────────────────┐
-│                     │                │                     │
-│   OpenBB Workspace  │ ───────────>   │       Agent         │
-│      (Frontend)     │     HTTP       │     (Backend)       │
-│                     │    Request     │                     │
-│                     │                │                     │
-│                     │   <───────────-│                     │
-│                     │      SSE       │                     │
-│                     │(message chunks,│                     │
-│                     │    citations,  │                     │
-│                     │    artifacts,  │                     │
-│                     │    etc.)       │                     │
-└─────────────────────┘                └─────────────────────┘
-```
-
-The architecture consists of two main components:
-
-1. **OpenBB Workspace (Frontend)**: The user interface where queries are entered
-2. **Vanilla Agent (Backend)**: Powered by OpenAI, handles the processing of queries and returns answers
-
-The frontend communicates with the backend via HTTP requests to the `/query`
-endpoint as defined in the agents.json schema.
-
-## Overview
-
-This implementation utilizes a FastAPI application to serve as the backend for
-the agent. 
-
-You're not limited to our setup! If you have preferences for different APIs or
-LLM frameworks, feel free to adapt this implementation. The key is to adhere to
-the schema defined by the `/query` endpoint and the specifications in
-`agents.json`.
 
 ## Getting started
 

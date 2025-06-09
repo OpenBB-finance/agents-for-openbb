@@ -1,29 +1,8 @@
-# Vanilla Agent with Reasoning Steps
+# Example agent with reasoning steps
 
 This is an example agent, powered by OpenAI, that can perform question answering
 and demonstrates how to display reasoning steps (sometimes referred to as
 "status updates") to the OpenBB Workspace.
-
-## Understanding reasoning steps
-OpenBB Workspace allows you to return "reasoning steps" (sometimes referred to
-as "thought steps" or even "status updates") from your custom agent to the
-front-end, while the agent is answering a query. This is often useful for
-providing updates and extra information to the user, particularly for
-long-running queries, or for complicated workflows.
-
-Similar to text chunks that contain the streamed response from the LLM, these
-reasoning steps are returned as SSEs (Server-Sent Events) to the front-end,
-which then displays them.
-
-## Overview
-
-This implementation utilizes a FastAPI application to serve as the backend for
-the agent. 
-
-You're not limited to our setup! If you have preferences for different APIs or
-LLM frameworks, feel free to adapt this implementation. The key is to adhere to
-the schema defined by the `/query` endpoint and the specifications in
-`copilot.json`.
 
 ## Getting started
 

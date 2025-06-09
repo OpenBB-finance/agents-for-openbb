@@ -7,7 +7,7 @@ agents that are compatible with the OpenBB Workspace.
 
 It depends heavily on the [OpenBB AI SDK](https://github.com/OpenBB-finance/openbb-ai).
 
-**For documentation on how to use the OpenBB AI SDK, see the [OpenBB AI SDK README](https://github.com/OpenBB-finance/openbb-ai).**
+For documentation on how to use the OpenBB AI SDK (highly recommended!), see the [OpenBB AI SDK README](https://github.com/OpenBB-finance/openbb-ai).
 
 ## Examples
 If you prefer diving straight into code, we have a growing list of examples of

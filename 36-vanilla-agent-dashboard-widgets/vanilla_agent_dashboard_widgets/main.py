@@ -56,7 +56,9 @@ def get_copilot_description():
 async def query(request: QueryRequest) -> EventSourceResponse:
     """Stream either a function call or an AI answer."""
     if not request.messages:
-        return JSONResponse(status_code=400, content={"detail": "messages list cannot be empty"})  # type: ignore[return-value]
+        return JSONResponse(
+            status_code=400, content={"detail": "messages list cannot be empty"}
+        )  # type: ignore[return-value]
 
     last_message = request.messages[-1]
 
@@ -88,14 +90,21 @@ async def query(request: QueryRequest) -> EventSourceResponse:
             for nm in primary_names:
                 lines.append(f"- {nm}")
 
-        text = "\n".join(lines) if lines else "I couldn't detect any widgets in your dashboard payload."
+        text = (
+            "\n".join(lines)
+            if lines
+            else "I couldn't detect any widgets in your dashboard payload."
+        )
 
         async def list_widgets_events():
             # Single, clean message without a leading empty chunk
             yield message_chunk(text)
 
         return EventSourceResponse(
-            content=(event.model_dump(exclude_none=True) async for event in list_widgets_events()),
+            content=(
+                event.model_dump(exclude_none=True)
+                async for event in list_widgets_events()
+            ),
             media_type="text/event-stream",
         )
 
@@ -106,7 +115,9 @@ async def query(request: QueryRequest) -> EventSourceResponse:
             widget_requests.append(
                 WidgetRequest(
                     widget=widget,
-                    input_arguments={param.name: param.current_value for param in widget.params},
+                    input_arguments={
+                        param.name: param.current_value for param in widget.params
+                    },
                 )
             )
 
@@ -114,7 +125,10 @@ async def query(request: QueryRequest) -> EventSourceResponse:
             yield get_widget_data(widget_requests)
 
         return EventSourceResponse(
-            content=(event.model_dump(exclude_none=True) async for event in retrieve_widget_data_primary()),
+            content=(
+                event.model_dump(exclude_none=True)
+                async for event in retrieve_widget_data_primary()
+            ),
             media_type="text/event-stream",
         )
 
@@ -127,13 +141,13 @@ async def query(request: QueryRequest) -> EventSourceResponse:
                 "You have access to a list of available dashboard widgets.\n"
                 "When you need data, respond ONLY with a JSON object using this exact schema (no extra text):\n"
                 "{\n"
-                "  \"function\": \"get_widget_data\",\n"
-                "  \"input_arguments\": {\n"
-                "    \"data_sources\": [{\n"
-                "      \"widget_uuid\": \"<uuid_from_list>\",\n"
-                "      \"origin\": \"<origin_from_list>\",\n"
-                "      \"id\": \"<widget_id_from_list>\",\n"
-                "      \"input_args\": { \"<param_name>\": \"<value>\" }\n"
+                '  "function": "get_widget_data",\n'
+                '  "input_arguments": {\n'
+                '    "data_sources": [{\n'
+                '      "widget_uuid": "<uuid_from_list>",\n'
+                '      "origin": "<origin_from_list>",\n'
+                '      "id": "<widget_id_from_list>",\n'
+                '      "input_args": { "<param_name>": "<value>" }\n'
                 "    }]\n"
                 "  }\n"
                 "}\n"
@@ -151,7 +165,9 @@ async def query(request: QueryRequest) -> EventSourceResponse:
         elif message.role == "ai":
             if isinstance(message.content, str):
                 openai_messages.append(
-                    ChatCompletionAssistantMessageParam(role="assistant", content=message.content)
+                    ChatCompletionAssistantMessageParam(
+                        role="assistant", content=message.content
+                    )
                 )
         elif message.role == "tool":
             # Only use the most recent tool result to avoid context bloat
@@ -165,9 +181,13 @@ async def query(request: QueryRequest) -> EventSourceResponse:
                             if getattr(item, "content", None):
                                 result_str += f"{item.content}\n"
                             elif getattr(item, "url", None):
-                                filename = getattr(getattr(item, "data_format", None), "filename", None)
+                                filename = getattr(
+                                    getattr(item, "data_format", None), "filename", None
+                                )
                                 if filename:
-                                    result_str += f"File available: {filename} ({item.url})\n"
+                                    result_str += (
+                                        f"File available: {filename} ({item.url})\n"
+                                    )
                                 else:
                                     result_str += f"File available at: {item.url}\n"
                             result_str += "------\n"
@@ -180,7 +200,9 @@ async def query(request: QueryRequest) -> EventSourceResponse:
     if request.widgets and (
         request.widgets.primary or request.widgets.secondary or request.widgets.extra
     ):
-        lines: list[str] = ["Available dashboard widgets (choose from these if needed):\n"]
+        lines: list[str] = [
+            "Available dashboard widgets (choose from these if needed):\n"
+        ]
         for bucket_name, bucket in (
             ("primary", request.widgets.primary or []),
             ("secondary", request.widgets.secondary or []),
@@ -237,7 +259,9 @@ async def query(request: QueryRequest) -> EventSourceResponse:
                 continue
         return None
 
-    async def execution_loop() -> AsyncGenerator[MessageChunkSSE | FunctionCallSSE, None]:
+    async def execution_loop() -> (
+        AsyncGenerator[MessageChunkSSE | FunctionCallSSE, None]
+    ):
         client = openai.AsyncOpenAI()
 
         stream = await client.chat.completions.create(
@@ -256,12 +280,14 @@ async def query(request: QueryRequest) -> EventSourceResponse:
             data = _extract_json_object(full_text)
             # Accept both `get_widget_data` and escaped variants (defensive)
             func = (data or {}).get("function") if isinstance(data, dict) else None
-            if isinstance(data, dict) and func and func.replace("\\_", "_") == "get_widget_data":
+            if (
+                isinstance(data, dict)
+                and func
+                and func.replace("\\_", "_") == "get_widget_data"
+            ):
                 # Build WidgetRequest list from declared data_sources by resolving
                 # widget UUIDs against the provided widgets in the request
-                ds_list = (
-                    data.get("input_arguments", {}).get("data_sources", []) or []
-                )
+                ds_list = data.get("input_arguments", {}).get("data_sources", []) or []
                 # Flatten available widgets for lookup
                 all_widgets = []
                 if request.widgets:
@@ -313,4 +339,6 @@ async def query(request: QueryRequest) -> EventSourceResponse:
         async for event in execution_loop():
             yield event.model_dump(exclude_none=True)
 
-    return EventSourceResponse(content=serialize_events(), media_type="text/event-stream")
+    return EventSourceResponse(
+        content=serialize_events(), media_type="text/event-stream"
+    )

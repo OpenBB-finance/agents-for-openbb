@@ -52,19 +52,9 @@ def get_copilot_description():
     )
 
 
-## Heuristics removed by request — the AI will choose widgets.
-
-
 @app.post("/v1/query")
 async def query(request: QueryRequest) -> EventSourceResponse:
-    """Query the Copilot.
-
-    Behavior:
-    - If primary widgets are present on a human message, immediately request their data.
-    - Otherwise, do not select widgets heuristically. Append the full list of dashboard widgets
-      to the LLM prompt so the model can decide and emit a get_widget_data function call.
-    - Fallback: stream a plain LLM response when no data is needed.
-    """
+    """Stream either a function call or an AI answer."""
     if not request.messages:
         return JSONResponse(status_code=400, content={"detail": "messages list cannot be empty"})  # type: ignore[return-value]
 
@@ -109,8 +99,6 @@ async def query(request: QueryRequest) -> EventSourceResponse:
             media_type="text/event-stream",
         )
 
-    # 2) Heuristics removed: do not auto-fetch from dashboard widgets.
-
     # 3) Auto-fetch data for explicitly selected primary widgets
     if last_message.role == "human" and request.widgets and request.widgets.primary:
         widget_requests: list[WidgetRequest] = []
@@ -125,15 +113,12 @@ async def query(request: QueryRequest) -> EventSourceResponse:
         async def retrieve_widget_data_primary():
             yield get_widget_data(widget_requests)
 
-        async def serialize_widget_events_primary():
-            async for event in retrieve_widget_data_primary():
-                yield event.model_dump(exclude_none=True)
+        return EventSourceResponse(
+            content=(event.model_dump(exclude_none=True) async for event in retrieve_widget_data_primary()),
+            media_type="text/event-stream",
+        )
 
-        return EventSourceResponse(content=serialize_widget_events_primary(), media_type="text/event-stream")
-
-    # 4) Heuristics removed: do not auto-fetch from dashboard widgets.
-
-    # 5) Fallback to plain LLM response
+    # Fallback to plain LLM response
     openai_messages: list[ChatCompletionMessageParam] = [
         ChatCompletionSystemMessageParam(
             role="system",

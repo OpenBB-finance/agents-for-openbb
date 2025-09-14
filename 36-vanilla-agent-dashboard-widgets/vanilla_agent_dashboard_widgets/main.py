@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from typing import AsyncGenerator
+import json
+import re
 
 import openai
 from fastapi import FastAPI
@@ -9,11 +11,7 @@ from fastapi.responses import JSONResponse
 from sse_starlette.sse import EventSourceResponse
 
 from openbb_ai import WidgetRequest, get_widget_data, message_chunk
-from openbb_ai.models import (
-    MessageChunkSSE,
-    QueryRequest,
-    Widget,
-)
+from openbb_ai.models import MessageChunkSSE, QueryRequest, FunctionCallSSE
 
 from openai.types.chat import (
     ChatCompletionAssistantMessageParam,
@@ -41,7 +39,7 @@ def get_copilot_description():
         content={
             "vanilla_agent_dashboard_widgets": {
                 "name": "Vanilla Agent Dashboard Widgets",
-                "description": "Recognizes relevant widgets from the current dashboard and fetches data.",
+                "description": "Passes all dashboard widgets to the LLM; the model selects widgets and issues function calls when needed.",
                 "image": "https://github.com/OpenBB-finance/copilot-for-terminal-pro/assets/14093308/7da2a512-93b9-478d-90bc-b8c3dd0cabcf",
                 "endpoints": {"query": "http://localhost:7777/v1/query"},
                 "features": {
@@ -54,58 +52,7 @@ def get_copilot_description():
     )
 
 
-def _select_relevant_dashboard_widgets(query: str, candidates: list[Widget]) -> list[Widget]:
-    """Simple heuristic to select relevant dashboard widgets based on the query.
-
-    - Matches on widget name or id appearing in the query
-    - Falls back to basic keyword mapping using the widget description
-    - Returns at most 1–2 widgets to keep results focused
-    """
-    if not candidates:
-        return []
-
-    q = query.lower()
-
-    # First pass: exact-ish name/id matches
-    exact_matches: list[Widget] = []
-    for w in candidates:
-        name = (w.name or "").lower()
-        wid = (w.widget_id or "").lower()
-        if not name and not wid:
-            continue
-        if (name and name in q) or (wid and wid in q):
-            exact_matches.append(w)
-
-    if exact_matches:
-        return exact_matches[:2]
-
-    # Second pass: keyword mapping using description/name
-    scored: list[tuple[int, Widget]] = []
-    keywords_map = {
-        "price": {"price", "stock price", "quote"},
-        "news": {"news", "headline", "article"},
-        "yield": {"yield", "curve", "rates"},
-        "volume": {"volume", "liquidity"},
-        "balance": {"balance", "sheet"},
-        "income": {"income", "revenue", "earnings"},
-        "transcript": {"transcript", "call"},
-        "historical": {"historical", "history"},
-    }
-
-    for w in candidates:
-        text = f"{w.name or ''} {w.description or ''} {w.widget_id or ''}".lower()
-        score = 0
-        for _, kws in keywords_map.items():
-            if any(kw in q and kw in text for kw in kws):
-                score += 1
-        if score > 0:
-            scored.append((score, w))
-
-    if not scored:
-        return []
-
-    scored.sort(key=lambda x: x[0], reverse=True)
-    return [w for _, w in scored[:2]]
+## Heuristics removed by request — the AI will choose widgets.
 
 
 @app.post("/v1/query")
@@ -114,8 +61,9 @@ async def query(request: QueryRequest) -> EventSourceResponse:
 
     Behavior:
     - If primary widgets are present on a human message, immediately request their data.
-    - Else, try to infer relevant dashboard widgets from `secondary` and request data.
-    - Else, stream a plain LLM response.
+    - Otherwise, do not select widgets heuristically. Append the full list of dashboard widgets
+      to the LLM prompt so the model can decide and emit a get_widget_data function call.
+    - Fallback: stream a plain LLM response when no data is needed.
     """
     if not request.messages:
         return JSONResponse(status_code=400, content={"detail": "messages list cannot be empty"})  # type: ignore[return-value]
@@ -153,52 +101,15 @@ async def query(request: QueryRequest) -> EventSourceResponse:
         text = "\n".join(lines) if lines else "I couldn't detect any widgets in your dashboard payload."
 
         async def list_widgets_events():
-            # Prime UI so message container exists
-            yield message_chunk(" ")
-            # Stream the list in a couple of chunks for UX
-            for part in ["\n".join(lines[:1]), "\n".join(lines[1:])]:
-                if part:
-                    yield message_chunk(part)
+            # Single, clean message without a leading empty chunk
+            yield message_chunk(text)
 
-        async def serialize_list_events():
-            async for event in list_widgets_events():
-                yield event.model_dump(exclude_none=True)
-
-        return EventSourceResponse(content=serialize_list_events(), media_type="text/event-stream")
-
-    # 2) If user explicitly asks to fetch data from dashboard widgets, do it
-    def _wants_dashboard_data_fetch(text: str | None) -> bool:
-        if not text:
-            return False
-        q = text.lower()
-        return (
-            ("dashboard" in q or "widget" in q)
-            and any(t in q for t in ["fetch", "get", "pull", "use", "show"])
-            and any(t in q for t in ["data", "info", "information", "results"])
+        return EventSourceResponse(
+            content=(event.model_dump(exclude_none=True) async for event in list_widgets_events()),
+            media_type="text/event-stream",
         )
 
-    if last_message.role == "human" and request.widgets and request.widgets.secondary and _wants_dashboard_data_fetch(last_message.content):
-        # Select relevant widgets if possible; otherwise take top 2 to avoid over-fetching
-        selected = _select_relevant_dashboard_widgets(last_message.content or "", request.widgets.secondary)  # type: ignore[arg-type]
-        if not selected:
-            selected = list(request.widgets.secondary)[:2]
-
-        widget_requests = [
-            WidgetRequest(
-                widget=w,
-                input_arguments={param.name: param.current_value for param in w.params},
-            )
-            for w in selected
-        ]
-
-        async def retrieve_widget_data_dashboard():
-            yield get_widget_data(widget_requests)
-
-        async def serialize_widget_events_dashboard():
-            async for event in retrieve_widget_data_dashboard():
-                yield event.model_dump(exclude_none=True)
-
-        return EventSourceResponse(content=serialize_widget_events_dashboard(), media_type="text/event-stream")
+    # 2) Heuristics removed: do not auto-fetch from dashboard widgets.
 
     # 3) Auto-fetch data for explicitly selected primary widgets
     if last_message.role == "human" and request.widgets and request.widgets.primary:
@@ -220,37 +131,28 @@ async def query(request: QueryRequest) -> EventSourceResponse:
 
         return EventSourceResponse(content=serialize_widget_events_primary(), media_type="text/event-stream")
 
-    # 4) Try to recognize relevant widgets from dashboard (secondary) and fetch data
-    if last_message.role == "human" and request.widgets and request.widgets.secondary:
-        candidates = request.widgets.secondary
-        selected = _select_relevant_dashboard_widgets(last_message.content or "", candidates)  # type: ignore[arg-type]
-        if not selected and len(candidates) == 1:
-            selected = list(candidates)
-        if selected:
-            widget_requests = [
-                WidgetRequest(
-                    widget=w,
-                    input_arguments={param.name: param.current_value for param in w.params},
-                )
-                for w in selected
-            ]
-
-            async def retrieve_widget_data_secondary():
-                yield get_widget_data(widget_requests)
-
-            async def serialize_widget_events_secondary():
-                async for event in retrieve_widget_data_secondary():
-                    yield event.model_dump(exclude_none=True)
-
-            return EventSourceResponse(content=serialize_widget_events_secondary(), media_type="text/event-stream")
+    # 4) Heuristics removed: do not auto-fetch from dashboard widgets.
 
     # 5) Fallback to plain LLM response
     openai_messages: list[ChatCompletionMessageParam] = [
         ChatCompletionSystemMessageParam(
             role="system",
             content=(
-                "You are a helpful financial assistant named 'Vanilla Agent'. "
-                "When possible, use data from widgets if the user has selected any."
+                "You are a helpful financial assistant named 'Vanilla Agent'.\n"
+                "You have access to a list of available dashboard widgets.\n"
+                "When you need data, respond ONLY with a JSON object using this exact schema (no extra text):\n"
+                "{\n"
+                "  \"function\": \"get_widget_data\",\n"
+                "  \"input_arguments\": {\n"
+                "    \"data_sources\": [{\n"
+                "      \"widget_uuid\": \"<uuid_from_list>\",\n"
+                "      \"origin\": \"<origin_from_list>\",\n"
+                "      \"id\": \"<widget_id_from_list>\",\n"
+                "      \"input_args\": { \"<param_name>\": \"<value>\" }\n"
+                "    }]\n"
+                "  }\n"
+                "}\n"
+                "Only choose widgets from the provided list. If no data is needed, answer normally."
             ),
         )
     ]
@@ -289,6 +191,41 @@ async def query(request: QueryRequest) -> EventSourceResponse:
                     pass
                 context_str += result_str
 
+    # If dashboard widgets are available, append them to context for the model to choose from.
+    if request.widgets and (
+        request.widgets.primary or request.widgets.secondary or request.widgets.extra
+    ):
+        lines: list[str] = ["Available dashboard widgets (choose from these if needed):\n"]
+        for bucket_name, bucket in (
+            ("primary", request.widgets.primary or []),
+            ("secondary", request.widgets.secondary or []),
+            ("extra", request.widgets.extra or []),
+        ):
+            if not bucket:
+                continue
+            lines.append(f"[{bucket_name}]\n")
+            for w in bucket:
+                # Render params: name + current_value snapshot
+                param_pairs = [
+                    f"{p.name}={(p.current_value if hasattr(p, 'current_value') else None)}"
+                    for p in w.params
+                ]
+                params_str = ", ".join(param_pairs)
+                lines.append(
+                    "- uuid="
+                    + str(getattr(w, "uuid", ""))
+                    + ", id="
+                    + (w.widget_id or "")
+                    + ", origin="
+                    + (w.origin or "")
+                    + ", name="
+                    + (w.name or "")
+                    + (f", params: {params_str}" if params_str else "")
+                )
+            lines.append("")
+        if lines:
+            context_str += "\n" + "\n".join(lines)
+
     # If we have context from the latest tool message, append it to the last user/assistant message
     if context_str and len(openai_messages) > 1:
         try:
@@ -297,11 +234,26 @@ async def query(request: QueryRequest) -> EventSourceResponse:
             # If last message isn't content-bearing, attach to system as fallback
             openai_messages[0]["content"] += "\n\n" + context_str  # type: ignore[index]
 
-    async def execution_loop() -> AsyncGenerator[MessageChunkSSE, None]:
-        client = openai.AsyncOpenAI()
+    def _strip_code_fences(text: str) -> str:
+        # Remove ```json ... ``` or ``` ... ``` fences if present
+        fence_match = re.search(r"```(?:json|JSON)?\s*([\s\S]*?)\s*```", text)
+        if fence_match:
+            return fence_match.group(1).strip()
+        return text.strip()
 
-        # Prime UI to create an empty message
-        yield message_chunk(" ")
+    def _extract_json_object(text: str) -> dict | None:
+        # Try direct parse, then strip common code fences and retry.
+        for candidate in (text, _strip_code_fences(text)):
+            try:
+                obj = json.loads(candidate)
+                if isinstance(obj, dict):
+                    return obj
+            except Exception:
+                continue
+        return None
+
+    async def execution_loop() -> AsyncGenerator[MessageChunkSSE | FunctionCallSSE, None]:
+        client = openai.AsyncOpenAI()
 
         stream = await client.chat.completions.create(
             model="gpt-4o",
@@ -309,9 +261,68 @@ async def query(request: QueryRequest) -> EventSourceResponse:
             stream=True,
         )
 
+        full_text = ""
         async for event in stream:
             if chunk := event.choices[0].delta.content:
-                yield message_chunk(chunk)
+                full_text += chunk
+
+        # Try to interpret the model output as a function call request
+        try:
+            data = _extract_json_object(full_text)
+            # Accept both `get_widget_data` and escaped variants (defensive)
+            func = (data or {}).get("function") if isinstance(data, dict) else None
+            if isinstance(data, dict) and func and func.replace("\\_", "_") == "get_widget_data":
+                # Build WidgetRequest list from declared data_sources by resolving
+                # widget UUIDs against the provided widgets in the request
+                ds_list = (
+                    data.get("input_arguments", {}).get("data_sources", []) or []
+                )
+                # Flatten available widgets for lookup
+                all_widgets = []
+                if request.widgets:
+                    for col in [
+                        request.widgets.primary or [],
+                        request.widgets.secondary or [],
+                        request.widgets.extra or [],
+                    ]:
+                        all_widgets.extend(col)
+
+                def find_widget(uuid: str | None, wid: str | None):
+                    if uuid:
+                        for w in all_widgets:
+                            if str(getattr(w, "uuid", "")) == str(uuid):
+                                return w
+                    if wid:
+                        for w in all_widgets:
+                            if (w.widget_id or "") == wid:
+                                return w
+                    return None
+
+                widget_requests: list[WidgetRequest] = []
+                for ds in ds_list:
+                    w_uuid = ds.get("widget_uuid")
+                    w_id = ds.get("id")
+                    widget = find_widget(w_uuid, w_id)
+                    if not widget:
+                        continue
+                    input_args = ds.get("input_args") or {
+                        p.name: p.current_value for p in widget.params
+                    }
+                    widget_requests.append(
+                        WidgetRequest(widget=widget, input_arguments=input_args)
+                    )
+
+                if widget_requests:
+                    # Emit a typed function call SSE so the UI retrieves data
+                    yield get_widget_data(widget_requests)
+                    return
+        except Exception:
+            # Not a function call; continue to output accumulated text
+            pass
+
+        # If no function call was detected, stream the final accumulated text (single message)
+        if full_text.strip():
+            yield message_chunk(full_text.strip())
 
     async def serialize_events():
         async for event in execution_loop():

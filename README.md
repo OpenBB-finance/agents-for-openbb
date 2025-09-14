@@ -2,16 +2,14 @@
 
 Welcome to the example repository for integrating custom agents into the OpenBB Workspace.
 
-This repository provides everything you need to build and add your own custom
-agents that are compatible with the OpenBB Workspace.
+This repository provides everything you need to build and add your own custom agents that are compatible with the OpenBB Workspace.
 
 It depends heavily on the [OpenBB AI SDK](https://github.com/OpenBB-finance/openbb-ai).
 
 For documentation on how to use the OpenBB AI SDK (highly recommended!), see the [OpenBB AI SDK README](https://github.com/OpenBB-finance/openbb-ai).
 
 ## Examples
-If you prefer diving straight into code, we have a growing list of examples of
-custom agents in this repository, varying in complexity and features:
+If you prefer diving straight into code, we have a growing list of examples of custom agents in this repository, varying in complexity and features:
 
 - [A vanilla agent that retrieves raw widget data](./30-vanilla-agent-raw-widget-data)
 
@@ -41,5 +39,8 @@ custom agents in this repository, varying in complexity and features:
 
 <img width="600" height="2072" alt="CleanShot 2025-09-14 at 17 06 14@2x" src="https://github.com/user-attachments/assets/7ada11a6-9b23-4e2d-bbd2-c03258606260" />
 
-These examples are a good starting point for building your own custom agent if
-you are interested in a specific feature or use case.
+- [A vanilla agent that can improve a user prompt](./financial-prompt-optimizer)
+
+<img width="600" height="1062" alt="CleanShot 2025-09-14 at 17 35 36@2x" src="https://github.com/user-attachments/assets/9290b805-baaa-4d83-b6e6-23e460264736" />
+
+These examples are a good starting point for building your own custom agent if you are interested in a specific feature or use case.

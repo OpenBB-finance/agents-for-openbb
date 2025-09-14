@@ -153,9 +153,9 @@ async def query(request: QueryRequest) -> EventSourceResponse:
         openai_messages[-1]["content"] += "\n\n" + context_str  # type: ignore
 
     # Define the execution loop.
-    async def execution_loop() -> AsyncGenerator[
-        MessageChunkSSE | CitationCollectionSSE, None
-    ]:
+    async def execution_loop() -> (
+        AsyncGenerator[MessageChunkSSE | CitationCollectionSSE, None]
+    ):
         client = openai.AsyncOpenAI()
 
         # Prime the UI with a minimal chunk so the AI message exists while tokens stream

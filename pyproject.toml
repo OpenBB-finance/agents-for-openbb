@@ -17,6 +17,7 @@ mypy = "^1.15.0"
 google-genai = "^1.11.0"
 asyncstdlib = "^3.13.1"
 openbb-ai = "^1.6.0"
+httpx-aiohttp = "^0.1.8"
 
 
 [tool.poetry.group.development.dependencies]

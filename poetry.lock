@@ -882,19 +882,19 @@ zstd = ["zstandard (>=0.18.0)"]
 
 [[package]]
 name = "httpx-aiohttp"
-version = "0.1.4"
+version = "0.1.8"
 description = "Aiohttp transport for HTTPX"
 optional = false
-python-versions = ">=3.9"
+python-versions = ">=3.8"
 groups = ["main"]
 files = [
-    {file = "httpx_aiohttp-0.1.4-py3-none-any.whl", hash = "sha256:740a8725af7b7a03d12f21ccd48a83457baa037304646589b87595746c05c87e"},
-    {file = "httpx_aiohttp-0.1.4.tar.gz", hash = "sha256:61030eed28deeac26286d2e872b7c167f5450b7b0eec5a617ae7d3f7da9c8684"},
+    {file = "httpx_aiohttp-0.1.8-py3-none-any.whl", hash = "sha256:b7bd958d1331f3759a38a0ba22ad29832cb63ca69498c17735228055bf78fa7e"},
+    {file = "httpx_aiohttp-0.1.8.tar.gz", hash = "sha256:756c5e74cdb568c3248ba63fe82bfe8bbe64b928728720f7eaac64b3cf46f308"},
 ]
 
 [package.dependencies]
-aiohttp = ">=3,<4"
-httpx = ">=0.28.1,<1"
+aiohttp = ">=3.10.0,<4"
+httpx = ">=0.27.0"
 
 [[package]]
 name = "huggingface-hub"
@@ -3037,4 +3037,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.10"
-content-hash = "4d6e66517caeaa27a1cea0c718ad451b82a305fb38cae61b7ab6c398e8861deb"
+content-hash = "dfd483c6aaba36c96ec9c5400ebdddaef616d56ac0212390333b7720090b38aa"

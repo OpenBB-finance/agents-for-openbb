@@ -126,16 +126,22 @@ async def query(request: QueryRequest) -> EventSourceResponse:
                     )
                 )
                 if filtered_widgets:
+                    widget = filtered_widgets[0]
+                    input_args = widget_data_request["input_args"]
+                    
+                    # Create extra_details with formatted parameter names and values
+                    extra_details = {}
+                    for param_name, param_value in input_args.items():
+                        if param_value is not None:
+                            # Format parameter name for display (convert snake_case to Title Case)
+                            display_name = param_name.replace('_', ' ').title()
+                            extra_details[display_name] = str(param_value)
+                    
                     citations_list.append(
                         cite(
-                            widget=filtered_widgets[0],
-                            input_arguments=widget_data_request["input_args"],
-                            # extra_details={
-                            #     filtered_widgets[0].name,
-                            #     widget_data_request[
-                            #         "input_args"
-                            #     ],
-                            # },
+                            widget=widget,
+                            input_arguments=input_args,
+                            extra_details=extra_details
                         )
                     )
 

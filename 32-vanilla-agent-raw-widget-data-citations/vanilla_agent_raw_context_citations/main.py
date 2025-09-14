@@ -8,11 +8,7 @@ from fastapi.responses import JSONResponse
 from sse_starlette.sse import EventSourceResponse
 
 from openbb_ai import get_widget_data, WidgetRequest, message_chunk, cite, citations
-from openbb_ai.models import (
-    MessageChunkSSE,
-    QueryRequest,
-    CitationCollectionSSE
-)
+from openbb_ai.models import MessageChunkSSE, QueryRequest, CitationCollectionSSE
 
 from openai.types.chat import (
     ChatCompletionMessageParam,
@@ -52,6 +48,7 @@ def get_copilot_description():
         }
     )
 
+
 @app.post("/v1/query")
 async def query(request: QueryRequest) -> EventSourceResponse:
     """Query the Copilot."""
@@ -81,7 +78,7 @@ async def query(request: QueryRequest) -> EventSourceResponse:
         async def serialize_widget_events():
             async for event in retrieve_widget_data():
                 yield event.model_dump(exclude_none=True)
-        
+
         return EventSourceResponse(
             content=serialize_widget_events(),
             media_type="text/event-stream",
@@ -133,17 +130,17 @@ async def query(request: QueryRequest) -> EventSourceResponse:
                 if filtered_widgets:
                     widget = filtered_widgets[0]
                     input_args = widget_data_request["input_args"]
-                    
+
                     # Create extra_details matching UI expectations
                     extra_details = {
                         "Widget Name": widget.name,
                         "Widget Input Arguments": input_args,
                     }
-                    
+
                     citation = cite(
                         widget=widget,
                         input_arguments=input_args,
-                        extra_details=extra_details
+                        extra_details=extra_details,
                     )
                     # Ensure citation has a plain string ID for the UI renderer
                     try:
@@ -156,7 +153,9 @@ async def query(request: QueryRequest) -> EventSourceResponse:
         openai_messages[-1]["content"] += "\n\n" + context_str  # type: ignore
 
     # Define the execution loop.
-    async def execution_loop() -> AsyncGenerator[MessageChunkSSE | CitationCollectionSSE, None]:
+    async def execution_loop() -> AsyncGenerator[
+        MessageChunkSSE | CitationCollectionSSE, None
+    ]:
         client = openai.AsyncOpenAI()
 
         # Prime the UI with a minimal chunk so the AI message exists while tokens stream
@@ -182,7 +181,7 @@ async def query(request: QueryRequest) -> EventSourceResponse:
     async def serialize_events():
         async for event in execution_loop():
             yield event.model_dump(exclude_none=True)
-    
+
     return EventSourceResponse(
         content=serialize_events(),
         media_type="text/event-stream",

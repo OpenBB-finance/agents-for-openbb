@@ -16,6 +16,7 @@ from openai.types.chat import (
     ChatCompletionSystemMessageParam,
 )
 
+
 app = FastAPI()
 
 app.add_middleware(
@@ -46,9 +47,10 @@ def get_copilot_description():
         }
     )
 
+
 @app.post("/v1/query")
 async def query(request: QueryRequest) -> EventSourceResponse:
-    """Query the Copilot."""
+    """Stream a concise optimized prompt and rationale."""
 
     openai_messages: list[ChatCompletionMessageParam] = [
         ChatCompletionSystemMessageParam(
@@ -56,8 +58,8 @@ async def query(request: QueryRequest) -> EventSourceResponse:
             content=(
                 "You are a concise Financial Prompt Optimizer.\n"
                 "Rewrite the user's prompt to be clearer, more specific, and immediately actionable for financial analysis.\n"
-                "Always return it as:\n"
-                "Optimized Prompt: <extensive detailed improved prompt with step-by-step>\n"
+                "Always return exactly the improved prompt:\n"
+                "Optimized Prompt: <detailed improved prompt with step-by-step>\n"
             ),
         )
     ]
@@ -91,4 +93,4 @@ async def query(request: QueryRequest) -> EventSourceResponse:
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run("financial_prompt_optimizer.main:app", host="0.0.0.0", port=7777, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=7777, reload=True)

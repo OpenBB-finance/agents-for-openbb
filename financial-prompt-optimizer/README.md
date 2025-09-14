@@ -34,7 +34,7 @@ poetry install --no-root
 
 ``` sh
 cd financial-prompt-optimizer
-poetry run uvicorn financial_prompt_optimizer.main:app --port 7777 --reload
+poetry run uvicorn main:app --port 7777 --reload
 ```
 
 This command runs the FastAPI application, making it accessible on your network.
@@ -57,4 +57,6 @@ the API by visiting: http://localhost:7777/docs
 When you send a user message, the agent streams a single answer containing two
 sections:
 
-- `Optimized Prompt: <improved prompt>`
+- `Optimized Prompt: <single improved prompt>`
+- `Rationale: <1–3 short bullets on what changed and why>`
+

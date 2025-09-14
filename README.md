@@ -37,5 +37,9 @@ custom agents in this repository, varying in complexity and features:
 
 <img width="600" height="2076" alt="35-pdf" src="https://github.com/user-attachments/assets/b6170465-0e63-4055-9cf3-f990e7e43f74" />
 
+- [A vanilla agent that can access widgets on the dashboard](./36-vanilla-agent-dashboard-widgets)
+
+<img width="600" height="2072" alt="CleanShot 2025-09-14 at 17 06 14@2x" src="https://github.com/user-attachments/assets/7ada11a6-9b23-4e2d-bbd2-c03258606260" />
+
 These examples are a good starting point for building your own custom agent if
 you are interested in a specific feature or use case.

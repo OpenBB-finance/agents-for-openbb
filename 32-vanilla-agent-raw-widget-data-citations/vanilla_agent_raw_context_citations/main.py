@@ -6,8 +6,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sse_starlette.sse import EventSourceResponse
 
-from openbb_ai.models import MessageChunkSSE, QueryRequest
 from openbb_ai import get_widget_data, WidgetRequest, message_chunk, cite, citations
+from openbb_ai.models import (
+    MessageChunkSSE,
+    QueryRequest,
+    CitationCollectionSSE
+)
 
 from openai.types.chat import (
     ChatCompletionMessageParam,
@@ -21,7 +25,7 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://pro.openbb.co"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -47,7 +51,6 @@ def get_copilot_description():
         }
     )
 
-
 @app.post("/v1/query")
 async def query(request: QueryRequest) -> EventSourceResponse:
     """Query the Copilot."""
@@ -71,7 +74,7 @@ async def query(request: QueryRequest) -> EventSourceResponse:
             )
 
         async def retrieve_widget_data():
-            yield get_widget_data(widget_requests).model_dump()
+            yield get_widget_data(widget_requests).model_dump(exclude_none=True)
 
         # Early exit to retrieve widget data
         return EventSourceResponse(
@@ -127,14 +130,12 @@ async def query(request: QueryRequest) -> EventSourceResponse:
                         cite(
                             widget=filtered_widgets[0],
                             input_arguments=widget_data_request["input_args"],
-                            # You can add any extra details you want to the
-                            # citation using the `extra_details` argument.
-                            extra_details={
-                                "Widget Name": filtered_widgets[0].name,
-                                "Widget Input Arguments": widget_data_request[
-                                    "input_args"
-                                ],
-                            },
+                            # extra_details={
+                            #     filtered_widgets[0].name,
+                            #     widget_data_request[
+                            #         "input_args"
+                            #     ],
+                            # },
                         )
                     )
 
@@ -142,21 +143,25 @@ async def query(request: QueryRequest) -> EventSourceResponse:
         openai_messages[-1]["content"] += "\n\n" + context_str  # type: ignore
 
     # Define the execution loop.
-    async def execution_loop() -> AsyncGenerator[MessageChunkSSE, None]:
+    async def execution_loop() -> AsyncGenerator[dict, None]:
         client = openai.AsyncOpenAI()
-        async for event in await client.chat.completions.create(
+
+        stream = await client.chat.completions.create(
             model="gpt-4o",
             messages=openai_messages,
             stream=True,
-        ):
+        )
+
+        async for event in stream:
             if chunk := event.choices[0].delta.content:
-                yield message_chunk(chunk).model_dump()
+                # Use the helper function and call model_dump() like Ada does
+                yield message_chunk(chunk).model_dump(exclude_none=True)
 
-        # If we have any citations, let's yield them at the end to the OpenBB Workspace.
+        # Use the citations helper function and call model_dump() like Ada does
         if citations_list:
-            yield citations(citations_list).model_dump()
+            yield citations(citations_list).model_dump(exclude_none=True)
 
-    # Stream the SSEs back to the client.
+    # Stream the SSEs back to the client exactly like Ada does
     return EventSourceResponse(
         content=execution_loop(),
         media_type="text/event-stream",

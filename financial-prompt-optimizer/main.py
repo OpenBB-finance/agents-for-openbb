@@ -71,7 +71,9 @@ async def query(request: QueryRequest) -> EventSourceResponse:
             )
         elif message.role == "ai" and isinstance(message.content, str):
             openai_messages.append(
-                ChatCompletionAssistantMessageParam(role="assistant", content=message.content)
+                ChatCompletionAssistantMessageParam(
+                    role="assistant", content=message.content
+                )
             )
 
     async def execution_loop() -> AsyncGenerator[MessageChunkSSE, None]:
@@ -85,7 +87,9 @@ async def query(request: QueryRequest) -> EventSourceResponse:
                 yield message_chunk(chunk)
 
     return EventSourceResponse(
-        content=(event.model_dump(exclude_none=True) async for event in execution_loop()),
+        content=(
+            event.model_dump(exclude_none=True) async for event in execution_loop()
+        ),
         media_type="text/event-stream",
     )
 

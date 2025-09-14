@@ -1,4 +1,5 @@
 from typing import AsyncGenerator
+from uuid import uuid4
 import openai
 
 from fastapi import FastAPI
@@ -74,11 +75,15 @@ async def query(request: QueryRequest) -> EventSourceResponse:
             )
 
         async def retrieve_widget_data():
-            yield get_widget_data(widget_requests).model_dump(exclude_none=True)
+            yield get_widget_data(widget_requests)
 
         # Early exit to retrieve widget data
+        async def serialize_widget_events():
+            async for event in retrieve_widget_data():
+                yield event.model_dump(exclude_none=True)
+        
         return EventSourceResponse(
-            content=retrieve_widget_data(),
+            content=serialize_widget_events(),
             media_type="text/event-stream",
         )
 
@@ -137,20 +142,30 @@ async def query(request: QueryRequest) -> EventSourceResponse:
                             display_name = param_name.replace('_', ' ').title()
                             extra_details[display_name] = str(param_value)
                     
-                    citations_list.append(
-                        cite(
-                            widget=widget,
-                            input_arguments=input_args,
-                            extra_details=extra_details
-                        )
+                    citation = cite(
+                        widget=widget,
+                        input_arguments=input_args,
+                        extra_details=extra_details
                     )
+                    # Ensure citation has a plain string ID for the UI renderer
+                    try:
+                        citation.id = str(citation.id)  # type: ignore[attr-defined]
+                    except Exception:
+                        citation.id = str(uuid4())  # type: ignore[attr-defined]
+                    citations_list.append(citation)
 
     if context_str:
         openai_messages[-1]["content"] += "\n\n" + context_str  # type: ignore
 
     # Define the execution loop.
-    async def execution_loop() -> AsyncGenerator[dict, None]:
+    async def execution_loop() -> AsyncGenerator[MessageChunkSSE | CitationCollectionSSE, None]:
         client = openai.AsyncOpenAI()
+
+        # Emit a tiny chunk to ensure the AI message group exists before citations
+        if citations_list:
+            yield message_chunk(" ")
+            # Emit citations early so the UI can render markers immediately
+            yield citations(citations_list)
 
         stream = await client.chat.completions.create(
             model="gpt-4o",
@@ -160,15 +175,19 @@ async def query(request: QueryRequest) -> EventSourceResponse:
 
         async for event in stream:
             if chunk := event.choices[0].delta.content:
-                # Use the helper function and call model_dump() like Ada does
-                yield message_chunk(chunk).model_dump(exclude_none=True)
+                # Yield typed events like Ada does
+                yield message_chunk(chunk)
 
-        # Use the citations helper function and call model_dump() like Ada does
-        if citations_list:
-            yield citations(citations_list).model_dump(exclude_none=True)
+        # Yield typed citations like Ada does
+        # Optionally, we could re-emit citations at the end if needed.
 
     # Stream the SSEs back to the client exactly like Ada does
+    # Let EventSourceResponse serialize the typed events
+    async def serialize_events():
+        async for event in execution_loop():
+            yield event.model_dump(exclude_none=True)
+    
     return EventSourceResponse(
-        content=execution_loop(),
+        content=serialize_events(),
         media_type="text/event-stream",
     )

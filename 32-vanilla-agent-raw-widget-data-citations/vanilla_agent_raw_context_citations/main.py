@@ -134,13 +134,11 @@ async def query(request: QueryRequest) -> EventSourceResponse:
                     widget = filtered_widgets[0]
                     input_args = widget_data_request["input_args"]
                     
-                    # Create extra_details with formatted parameter names and values
-                    extra_details = {}
-                    for param_name, param_value in input_args.items():
-                        if param_value is not None:
-                            # Format parameter name for display (convert snake_case to Title Case)
-                            display_name = param_name.replace('_', ' ').title()
-                            extra_details[display_name] = str(param_value)
+                    # Create extra_details matching UI expectations
+                    extra_details = {
+                        "Widget Name": widget.name,
+                        "Widget Input Arguments": input_args,
+                    }
                     
                     citation = cite(
                         widget=widget,
@@ -161,11 +159,8 @@ async def query(request: QueryRequest) -> EventSourceResponse:
     async def execution_loop() -> AsyncGenerator[MessageChunkSSE | CitationCollectionSSE, None]:
         client = openai.AsyncOpenAI()
 
-        # Emit a tiny chunk to ensure the AI message group exists before citations
-        if citations_list:
-            yield message_chunk(" ")
-            # Emit citations early so the UI can render markers immediately
-            yield citations(citations_list)
+        # Prime the UI with a minimal chunk so the AI message exists while tokens stream
+        yield message_chunk(" ")
 
         stream = await client.chat.completions.create(
             model="gpt-4o",
@@ -178,8 +173,9 @@ async def query(request: QueryRequest) -> EventSourceResponse:
                 # Yield typed events like Ada does
                 yield message_chunk(chunk)
 
-        # Yield typed citations like Ada does
-        # Optionally, we could re-emit citations at the end if needed.
+        # Append citations at the end, after the main content
+        if citations_list:
+            yield citations(citations_list)
 
     # Stream the SSEs back to the client exactly like Ada does
     # Let EventSourceResponse serialize the typed events

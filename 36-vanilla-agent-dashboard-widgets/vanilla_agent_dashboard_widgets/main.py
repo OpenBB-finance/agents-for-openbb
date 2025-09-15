@@ -172,9 +172,19 @@ async def query(request: QueryRequest) -> EventSourceResponse:
     if request.messages and request.messages[-1].role == "tool":
         # Extract widget name and data
         widget_name = "Unknown Widget"
+        widget_request_str = ""
         if all_widgets:
             last_widget = all_widgets[-1]
             widget_name = last_widget.name or last_widget.widget_id or 'Unnamed'
+            # Build the request string that was sent
+            widget_request_str = f"Widget: {widget_name}\n"
+            widget_request_str += f"Widget ID: {last_widget.widget_id}\n"
+            if last_widget.params:
+                widget_request_str += "Parameters sent:\n"
+                for p in last_widget.params:
+                    current_val = getattr(p, 'current_value', None)
+                    if current_val is not None:
+                        widget_request_str += f"  - {p.name}: {current_val}\n"
         
         # Extract data content
         data_content = ""
@@ -188,7 +198,11 @@ async def query(request: QueryRequest) -> EventSourceResponse:
         if data_content:
             sample = data_content[:500] + "..." if len(data_content) > 500 else data_content
             async def show_data_sample():
-                yield message_chunk(f"Fetching sample data from last widget: {widget_name}\n\nSample of widget data:\n```\n{sample}\n```").model_dump()
+                msg = f"Fetching sample data from last widget: {widget_name}\n\n"
+                if widget_request_str:
+                    msg += f"**Request sent to UI:**\n```\n{widget_request_str}```\n\n"
+                msg += f"**Sample of widget data returned:**\n```\n{sample}\n```"
+                yield message_chunk(msg).model_dump()
             
             return EventSourceResponse(
                 content=show_data_sample(),

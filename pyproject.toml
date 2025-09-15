@@ -16,7 +16,7 @@ pdfplumber = "^0.11.5"
 mypy = "^1.15.0"
 google-genai = "^1.11.0"
 asyncstdlib = "^3.13.1"
-openbb-ai = "^1.6.0"
+openbb-ai = "^1.7.4"
 
 
 [tool.poetry.group.development.dependencies]

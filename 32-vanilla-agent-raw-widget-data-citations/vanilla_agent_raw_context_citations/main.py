@@ -130,9 +130,7 @@ async def query(request: QueryRequest) -> EventSourceResponse:
                             # You can add any extra details you want to the
                             # citation using the `extra_details` argument.
                             extra_details={
-                                **widget_data_request[
-                                    "input_args"
-                                ],
+                                **widget_data_request["input_args"],
                             },
                         )
                     )

@@ -52,14 +52,23 @@ async def query(request: QueryRequest) -> EventSourceResponse:
         if request.widgets.extra:
             all_widgets.extend(request.widgets.extra)
     
-    # Build widget list string (used in multiple places)
+    # Build widget list string with separation between explicit and dashboard context
     widget_list_msg = ""
+    
+    # Explicit Context (Primary) - widgets explicitly selected
+    if request.widgets and request.widgets.primary:
+        widget_list_msg += "**Explicit Context (Primary)**\n"
+        for w in request.widgets.primary:
+            widget_list_msg += f"  - {w.name or w.widget_id or 'Unnamed Widget'}\n"
+        widget_list_msg += "\n"
+    
+    # Dashboard Context (Secondary) - widgets from current dashboard
     if request.workspace_state and request.workspace_state.current_dashboard_info:
         tabs = request.workspace_state.current_dashboard_info.tabs
         active_tab = request.workspace_state.current_dashboard_info.current_tab_id
         
         if tabs:
-            widget_list_msg = "Widgets on your current dashboard:\n\n"
+            widget_list_msg += "**Dashboard Context (Secondary)**\n\n"
             if active_tab:
                 widget_list_msg += f"Active tab: {active_tab}\n\n"
             
@@ -71,8 +80,9 @@ async def query(request: QueryRequest) -> EventSourceResponse:
                 else:
                     widget_list_msg += "  (no widgets)\n"
                 widget_list_msg += "\n"
-    elif all_widgets:
-        widget_list_msg = "Available widgets:\n\n"
+    elif all_widgets and not (request.widgets and request.widgets.primary):
+        # Fallback if no primary widgets shown above
+        widget_list_msg += "**Available widgets**\n\n"
         for w in all_widgets:
             widget_list_msg += f"  - {w.name or w.widget_id or 'Unnamed Widget'}\n"
         widget_list_msg += "\n"

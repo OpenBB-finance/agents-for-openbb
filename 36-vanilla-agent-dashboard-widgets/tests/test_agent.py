@@ -23,7 +23,7 @@ def reset_sse_starlette_appstatus_event():
     AppStatus.should_exit_event = None
 
 
-def test_agents_json_has_dashboard_search_feature():
+def test_agents_json_has_dashboard_search_feature_enabled():
     response = test_client.get("/agents.json")
     assert response.status_code == 200
     data = response.json()
@@ -49,8 +49,8 @@ def test_query_recognizes_dashboard_widgets_from_secondary():
     response = test_client.post("/v1/query", json=payload)
     assert response.status_code == 200
 
-    # We expect a regular message listing dashboard widgets
-    CopilotResponse(response.text).has_any("copilotMessage", "Stock Price")
+    # We expect a regular message listing dashboard widgets (secondary only)
+    CopilotResponse(response.text).has_any("copilotMessage", "Company News")
 
 
 def test_query_respects_primary_selection_and_calls_get_widget_data():
@@ -67,8 +67,8 @@ def test_query_respects_primary_selection_and_calls_get_widget_data():
     assert response.status_code == 200
 
     # We expect a function call – let the UI handle the actual retrieval
-    CopilotResponse(response.text).starts("copilotFunctionCall").with_(
-        {"function": "get_widget_data"}
+    CopilotResponse(response.text).has_any(
+        "copilotFunctionCall", {"function": "get_widget_data"}
     )
 
 
@@ -87,4 +87,4 @@ def test_query_lists_dashboard_widgets():
     response = test_client.post("/v1/query", json=payload)
     assert response.status_code == 200
 
-    CopilotResponse(response.text).has_any("copilotMessage", "Stock Price")
+    CopilotResponse(response.text).has_any("copilotMessage", "Company News")

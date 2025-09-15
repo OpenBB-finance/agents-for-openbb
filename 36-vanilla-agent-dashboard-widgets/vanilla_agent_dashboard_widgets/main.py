@@ -45,12 +45,12 @@ async def query(request: QueryRequest) -> EventSourceResponse:
     # Get all widgets from dashboard (used in multiple places)
     all_widgets = []
     if request.widgets:
+        # These are the widgets that are available in the explicit context tab
         if request.widgets.primary:
             all_widgets.extend(request.widgets.primary)
+        # These are the widgets that are available in the dashboard
         if request.widgets.secondary:
             all_widgets.extend(request.widgets.secondary)
-        if request.widgets.extra:
-            all_widgets.extend(request.widgets.extra)
     
     # Helper function to format widget details
     def format_widget(w):
@@ -88,7 +88,6 @@ async def query(request: QueryRequest) -> EventSourceResponse:
             msg += "\n"
         return msg
     
-    # Build widget list string with separation between explicit and dashboard context
     widget_list_msg = ""
     
     # Explicit Context (Primary) - widgets explicitly selected
@@ -99,6 +98,8 @@ async def query(request: QueryRequest) -> EventSourceResponse:
         widget_list_msg += "\n"
     
     # Dashboard Context (Secondary) - widgets from current dashboard
+    # Although all widgets are already in all_widgets, we want to show them grouped by tab
+    # and for that we need to use the workspace_state.current_dashboard_info
     if request.workspace_state and request.workspace_state.current_dashboard_info:
         tabs = request.workspace_state.current_dashboard_info.tabs
         active_tab = request.workspace_state.current_dashboard_info.current_tab_id

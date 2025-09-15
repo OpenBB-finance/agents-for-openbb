@@ -58,7 +58,12 @@ async def query(request: QueryRequest) -> EventSourceResponse:
         msg += "| Field | Value |\n"
         msg += "|-------|-------|\n"
         msg += f"| Name | {w.name or 'N/A'} |\n"
-        msg += f"| Description | {w.description or 'N/A'} |\n"
+        # Clean up description - replace newlines with spaces
+        description = str(w.description or 'N/A')
+        description = description.replace('\n', ' ').replace('  ', ' ').strip()
+        if len(description) > 150:
+            description = description[:147] + '...'
+        msg += f"| Description | {description} |\n"
         msg += f"| ID | {w.widget_id or 'N/A'} |\n"
         msg += f"| Category | {getattr(w, 'category', 'N/A') or 'N/A'} |\n"
         msg += f"| UUID | {getattr(w, 'uuid', 'N/A') or 'N/A'} |\n\n"

@@ -57,9 +57,41 @@ async def query(request: QueryRequest) -> EventSourceResponse:
     
     # Explicit Context (Primary) - widgets explicitly selected
     if request.widgets and request.widgets.primary:
-        widget_list_msg += "**Explicit Context (Primary)**\n"
+        widget_list_msg += "# Explicit Context (Primary)\n\n"
         for w in request.widgets.primary:
-            widget_list_msg += f"  - {w.name or w.widget_id or 'Unnamed Widget'}\n"
+
+            widget_list_msg += f"### {w.name or w.widget_id or 'Unnamed Widget'}\n\n"
+            widget_list_msg += "| Field | Value |\n"
+            widget_list_msg += "|-------|-------|\n"
+            widget_list_msg += f"| Name | {w.name or 'N/A'} |\n"
+            widget_list_msg += f"| Description | {w.description or 'N/A'} |\n"
+            widget_list_msg += f"| ID | {w.widget_id or 'N/A'} |\n"
+            widget_list_msg += f"| Category | {getattr(w, 'category', 'N/A') or 'N/A'} |\n"
+            widget_list_msg += f"| UUID | {getattr(w, 'uuid', 'N/A') or 'N/A'} |\n\n"
+            
+            # Parameters table
+            if w.params:
+                widget_list_msg += f"#### {w.name or w.widget_id or 'Unnamed Widget'} Parameters\n\n"
+                widget_list_msg += "| Parameter | Type | Default | Current | Options | Description |\n"
+                widget_list_msg += "|-----------|------|---------|---------|---------|-------------|\n"
+                for p in w.params:
+                    param_type = str(getattr(p, 'type', 'N/A') or 'N/A')
+                    default_val = str(getattr(p, 'default_value', 'N/A') or 'N/A')
+                    current_val = str(getattr(p, 'current_value', 'N/A') or 'N/A')
+                    # Clean up description - replace newlines with spaces
+                    param_desc = str(getattr(p, 'description', 'N/A') or 'N/A')
+                    param_desc = param_desc.replace('\n', ' ').replace('  ', ' ').strip()
+                    # Truncate long descriptions
+                    if len(param_desc) > 100:
+                        param_desc = param_desc[:97] + '...'
+                    # Handle possible options
+                    options = getattr(p, 'options', None)
+                    options_str = ', '.join(str(o) for o in options) if options else ''
+                    # Truncate long options list
+                    if len(options_str) > 50:
+                        options_str = options_str[:47] + '...'
+                    widget_list_msg += f"| {p.name} | {param_type} | {default_val} | {current_val} | {options_str} | {param_desc} |\n"
+                widget_list_msg += "\n"
         widget_list_msg += "\n"
     
     # Dashboard Context (Secondary) - widgets from current dashboard
@@ -68,15 +100,59 @@ async def query(request: QueryRequest) -> EventSourceResponse:
         active_tab = request.workspace_state.current_dashboard_info.current_tab_id
         
         if tabs:
-            widget_list_msg += "**Dashboard Context (Secondary)**\n\n"
+            widget_list_msg += "# Dashboard Context (Secondary)\n\n"
             if active_tab:
                 widget_list_msg += f"Active tab: {active_tab}\n\n"
             
             for tab in tabs:
-                widget_list_msg += f"[Tab: {tab.tab_id}]\n"
+                widget_list_msg += f"## Tab: {tab.tab_id}\n\n"
                 if tab.widgets:
                     for widget in tab.widgets:
-                        widget_list_msg += f"  - {widget.name}\n"
+                        # Look up full widget details from all_widgets
+                        full_widget = None
+                        for w in all_widgets:
+                            if str(getattr(w, 'uuid', '')) == str(widget.widget_uuid):
+                                full_widget = w
+                                break
+                        
+                        widget_list_msg += f"### {widget.name}\n\n"
+                        widget_list_msg += "| Field | Value |\n"
+                        widget_list_msg += "|-------|-------|\n"
+                        widget_list_msg += f"| Name | {widget.name or 'N/A'} |\n"
+                        if full_widget:
+                            widget_list_msg += f"| Description | {full_widget.description or 'N/A'} |\n"
+                            widget_list_msg += f"| ID | {full_widget.widget_id or 'N/A'} |\n"
+                            widget_list_msg += f"| Category | {getattr(full_widget, 'category', 'N/A') or 'N/A'} |\n"
+                            widget_list_msg += f"| UUID | {widget.widget_uuid or 'N/A'} |\n\n"
+                            
+                            # Parameters table
+                            if full_widget.params:
+                                widget_list_msg += f"#### {widget.name} Parameters\n\n"
+                                widget_list_msg += "| Parameter | Type | Default | Current | Options | Description |\n"
+                                widget_list_msg += "|-----------|------|---------|---------|---------|-------------|\n"
+                                for p in full_widget.params:
+                                    param_type = str(getattr(p, 'type', 'N/A') or 'N/A')
+                                    default_val = str(getattr(p, 'default_value', 'N/A') or 'N/A')
+                                    current_val = str(getattr(p, 'current_value', 'N/A') or 'N/A')
+                                    # Clean up description - replace newlines with spaces
+                                    param_desc = str(getattr(p, 'description', 'N/A') or 'N/A')
+                                    param_desc = param_desc.replace('\n', ' ').replace('  ', ' ').strip()
+                                    # Truncate long descriptions
+                                    if len(param_desc) > 100:
+                                        param_desc = param_desc[:97] + '...'
+                                    # Handle possible options
+                                    options = getattr(p, 'options', None)
+                                    options_str = ', '.join(str(o) for o in options) if options else ''
+                                    # Truncate long options list
+                                    if len(options_str) > 50:
+                                        options_str = options_str[:47] + '...'
+                                    widget_list_msg += f"| {p.name} | {param_type} | {default_val} | {current_val} | {options_str} | {param_desc} |\n"
+                                widget_list_msg += "\n"
+                        else:
+                            widget_list_msg += "| Description | N/A |\n"
+                            widget_list_msg += "| ID | N/A |\n"
+                            widget_list_msg += "| Category | N/A |\n"
+                            widget_list_msg += f"| UUID | {widget.widget_uuid or 'N/A'} |\n\n"
                 else:
                     widget_list_msg += "  (no widgets)\n"
                 widget_list_msg += "\n"
@@ -84,7 +160,38 @@ async def query(request: QueryRequest) -> EventSourceResponse:
         # Fallback if no primary widgets shown above
         widget_list_msg += "**Available widgets**\n\n"
         for w in all_widgets:
-            widget_list_msg += f"  - {w.name or w.widget_id or 'Unnamed Widget'}\n"
+            widget_list_msg += f"### {w.name or w.widget_id or 'Unnamed Widget'}\n\n"
+            widget_list_msg += "| Field | Value |\n"
+            widget_list_msg += "|-------|-------|\n"
+            widget_list_msg += f"| Name | {w.name or 'N/A'} |\n"
+            widget_list_msg += f"| Description | {w.description or 'N/A'} |\n"
+            widget_list_msg += f"| ID | {w.widget_id or 'N/A'} |\n"
+            widget_list_msg += f"| Category | {getattr(w, 'category', 'N/A') or 'N/A'} |\n"
+            widget_list_msg += f"| UUID | {getattr(w, 'uuid', 'N/A') or 'N/A'} |\n\n"
+            
+            # Parameters table
+            if w.params:
+                widget_list_msg += "**Parameters:**\n\n"
+                widget_list_msg += "| Parameter | Type | Default | Current | Options | Description |\n"
+                widget_list_msg += "|-----------|------|---------|---------|---------|-------------|\n"
+                for p in w.params:
+                    param_type = str(getattr(p, 'type', 'N/A') or 'N/A')
+                    default_val = str(getattr(p, 'default_value', 'N/A') or 'N/A')
+                    current_val = str(getattr(p, 'current_value', 'N/A') or 'N/A')
+                    # Clean up description - replace newlines with spaces
+                    param_desc = str(getattr(p, 'description', 'N/A') or 'N/A')
+                    param_desc = param_desc.replace('\n', ' ').replace('  ', ' ').strip()
+                    # Truncate long descriptions
+                    if len(param_desc) > 100:
+                        param_desc = param_desc[:97] + '...'
+                    # Handle possible options
+                    options = getattr(p, 'options', None)
+                    options_str = ', '.join(str(o) for o in options) if options else ''
+                    # Truncate long options list
+                    if len(options_str) > 50:
+                        options_str = options_str[:47] + '...'
+                    widget_list_msg += f"| {p.name} | {param_type} | {default_val} | {current_val} | {options_str} | {param_desc} |\n"
+                widget_list_msg += "\n"
         widget_list_msg += "\n"
 
     # Always show widget list and fetch last widget data on human messages

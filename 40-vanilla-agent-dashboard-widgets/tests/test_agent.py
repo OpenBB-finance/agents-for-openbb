@@ -107,11 +107,11 @@ def test_query_does_not_fetch_widget_data():
 
     response = test_client.post("/v1/query", json=payload)
     assert response.status_code == 200
-    
+
     # Should NOT have any function calls for get_widget_data
     response_text = response.text
     assert "get_widget_data" not in response_text
     assert "copilotFunctionCall" not in response_text
-    
+
     # Should only have messages listing widgets
     CopilotResponse(response.text).has_any("copilotMessage")

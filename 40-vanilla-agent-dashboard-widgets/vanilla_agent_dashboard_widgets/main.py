@@ -161,7 +161,6 @@ async def query(request: QueryRequest) -> EventSourceResponse:
             media_type="text/event-stream",
         )
 
-
     # If we reach here, no specific handler matched - return empty response
     async def empty_response():
         yield message_chunk("No action taken.").model_dump()

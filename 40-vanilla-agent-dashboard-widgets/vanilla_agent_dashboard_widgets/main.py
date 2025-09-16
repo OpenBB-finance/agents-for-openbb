@@ -146,79 +146,21 @@ async def query(request: QueryRequest) -> EventSourceResponse:
             widget_list_msg += format_widget(w)
         widget_list_msg += "\n"
 
-    # Always show widget list and fetch last widget data on human messages
+    # Always show widget list on human messages
     if request.messages[-1].role == "human":
-        # Stream widget list and then fetch last widget data
-        async def show_widgets_and_fetch():
-            # Show the widget list (first message completes here)
+        # Stream widget list only
+        async def show_widgets():
             if widget_list_msg:
                 yield message_chunk(widget_list_msg.rstrip()).model_dump()
-
-            # Then fetch data from the last widget if available
-            if all_widgets:
-                last_widget = all_widgets[-1]
-                widget_requests = [
-                    WidgetRequest(
-                        widget=last_widget,
-                        input_arguments={
-                            param.name: param.current_value
-                            for param in last_widget.params
-                        },
-                    )
-                ]
-                yield get_widget_data(widget_requests).model_dump()
-            elif not widget_list_msg:
+            else:
                 yield message_chunk("No widgets found on your dashboard.").model_dump()
 
-        # Return early with widget info and data fetch
+        # Return early with widget info only
         return EventSourceResponse(
-            content=show_widgets_and_fetch(),
+            content=show_widgets(),
             media_type="text/event-stream",
         )
 
-    # Check if we just received tool data - if so, show a sample and continue conversation
-    if request.messages and request.messages[-1].role == "tool":
-        # Extract widget name and data
-        widget_name = "Unknown Widget"
-        widget_request_str = ""
-        if all_widgets:
-            last_widget = all_widgets[-1]
-            widget_name = last_widget.name or last_widget.widget_id or "Unnamed"
-            # Build the request string that was sent
-            widget_request_str = f"Widget: {widget_name}\n"
-            widget_request_str += f"Widget ID: {last_widget.widget_id}\n"
-            if last_widget.params:
-                widget_request_str += "Parameters sent:\n"
-                for p in last_widget.params:
-                    current_val = getattr(p, "current_value", None)
-                    if current_val is not None:
-                        widget_request_str += f"  - {p.name}: {current_val}\n"
-
-        # Extract data content
-        data_content = ""
-        for result in request.messages[-1].data:
-            for item in result.items:
-                data_content = item.content
-                break
-            if data_content:
-                break
-
-        if data_content:
-            sample = (
-                data_content[:500] + "..." if len(data_content) > 500 else data_content
-            )
-
-            async def show_data_sample():
-                msg = f"Fetching sample data from last widget: {widget_name}\n\n"
-                if widget_request_str:
-                    msg += f"**Request sent to UI:**\n```\n{widget_request_str}```\n\n"
-                msg += f"**Sample of widget data returned:**\n```\n{sample}\n```"
-                yield message_chunk(msg).model_dump()
-
-            return EventSourceResponse(
-                content=show_data_sample(),
-                media_type="text/event-stream",
-            )
 
     # If we reach here, no specific handler matched - return empty response
     async def empty_response():

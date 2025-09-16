@@ -4,7 +4,7 @@ from fastapi.responses import JSONResponse
 from sse_starlette.sse import EventSourceResponse
 
 from openbb_ai.models import QueryRequest
-from openbb_ai import get_widget_data, WidgetRequest, message_chunk
+from openbb_ai import message_chunk
 
 
 app = FastAPI()

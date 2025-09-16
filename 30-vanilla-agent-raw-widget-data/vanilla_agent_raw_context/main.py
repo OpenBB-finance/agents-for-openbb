@@ -60,6 +60,10 @@ async def query(request: QueryRequest) -> EventSourceResponse:
         and request.widgets.primary
     ):
         widget_requests: list[WidgetRequest] = []
+        # Note: If we wanted to iterate through the widgets on the dashboard
+        # rather than on the widgets on the explicit context
+        # then we would need to iterate through request.widgets.secondary
+        # and the agents.json would need "widget-dashboard-search": True
         for widget in request.widgets.primary:
             widget_requests.append(
                 WidgetRequest(

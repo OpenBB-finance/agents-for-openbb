@@ -1,13 +1,16 @@
-# 36 - Vanilla Agent Dashboard Widgets
+# 40 - Vanilla Agent Dashboard Widgets
 
-This example demonstrates a simple agent that receives the full list of widgets present on the current dashboard and passes that context directly to the LLM. The model decides which widget(s) to use and issues a function call accordingly.
+This example demonstrates a simple agent that lists all widgets available on the current dashboard, showing their metadata and parameters in a structured format.
 
 Key behaviors:
 
 - Exposes `agents.json` with `widget-dashboard-search` enabled so the Workspace sends dashboard widget metadata (as `widgets.secondary`, etc.).
-- If the user has selected primary widgets, the agent immediately issues a function call to fetch data for them.
-- Otherwise, the agent does not select widgets heuristically. It appends the full dashboard widget list to the prompt and instructs the LLM to respond with a `get_widget_data` JSON function call when needed.
-- Falls back to a plain LLM reply if no data is needed.
+- Lists all widgets from both explicit context (primary) and dashboard context (secondary).
+- Shows detailed widget information including:
+  - Widget metadata (name, description, ID, category, UUID)
+  - Parameters table with type, default, current values, options, and descriptions
+- Organizes dashboard widgets by tabs for better visibility.
+- Does NOT automatically fetch widget data - focuses purely on widget discovery and listing.
 
 ## Run locally
 

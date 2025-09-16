@@ -32,7 +32,7 @@ def test_agents_json_has_dashboard_search_feature_enabled():
     assert agent["features"]["widget-dashboard-search"] is True
 
 
-def test_query_recognizes_dashboard_widgets_from_secondary():
+def test_query_lists_dashboard_widgets_from_secondary():
     test_payload_path = (
         Path(__file__).parent.parent.parent
         / "testing"
@@ -43,17 +43,19 @@ def test_query_recognizes_dashboard_widgets_from_secondary():
 
     # Simulate no explicit primary selection
     payload["widgets"]["primary"] = []
-    # Ask to list widgets instead of retrieving; ensures non-LLM path is exercised
+    # Ask to list widgets
     payload["messages"][0]["content"] = "What widgets are available in the dashboard?"
 
     response = test_client.post("/v1/query", json=payload)
     assert response.status_code == 200
 
-    # We expect a regular message listing dashboard widgets (secondary only)
+    # We expect a message listing dashboard widgets (secondary only)
     CopilotResponse(response.text).has_any("copilotMessage", "Company News")
+    # Should show dashboard context header
+    CopilotResponse(response.text).has_any("copilotMessage", "Dashboard Context")
 
 
-def test_query_respects_primary_selection_and_calls_get_widget_data():
+def test_query_lists_primary_widgets_when_selected():
     # Use same payload but keep primary set
     test_payload_path = (
         Path(__file__).parent.parent.parent
@@ -66,14 +68,13 @@ def test_query_respects_primary_selection_and_calls_get_widget_data():
     response = test_client.post("/v1/query", json=payload)
     assert response.status_code == 200
 
-    # We expect a function call – let the UI handle the actual retrieval
-    CopilotResponse(response.text).has_any(
-        "copilotFunctionCall", {"function": "get_widget_data"}
-    )
+    # We expect a message listing widgets including primary context
+    CopilotResponse(response.text).has_any("copilotMessage", "Explicit Context")
+    # Should also show dashboard context if available
+    CopilotResponse(response.text).has_any("copilotMessage", "Dashboard Context")
 
 
-def test_query_lists_dashboard_widgets():
-    # Ask to list widgets and expect a direct message with names
+def test_query_shows_widget_metadata_and_parameters():
     test_payload_path = (
         Path(__file__).parent.parent.parent
         / "testing"
@@ -81,10 +82,36 @@ def test_query_lists_dashboard_widgets():
         / "retrieve_widget_from_dashboard.json"
     )
     payload = json.load(open(test_payload_path))
-    payload["widgets"]["primary"] = []
-    payload["messages"][0]["content"] = "What widgets are available in the dashboard?"
+    payload["messages"][0]["content"] = "Show me widget details"
 
     response = test_client.post("/v1/query", json=payload)
     assert response.status_code == 200
 
-    CopilotResponse(response.text).has_any("copilotMessage", "Company News")
+    # Should show widget metadata fields
+    CopilotResponse(response.text).has_any("copilotMessage", "Description")
+    CopilotResponse(response.text).has_any("copilotMessage", "UUID")
+    # Should show parameters table
+    CopilotResponse(response.text).has_any("copilotMessage", "Parameters")
+
+
+def test_query_does_not_fetch_widget_data():
+    """Test that the agent only lists widgets and does not fetch data"""
+    test_payload_path = (
+        Path(__file__).parent.parent.parent
+        / "testing"
+        / "test_payloads"
+        / "retrieve_widget_from_dashboard.json"
+    )
+    payload = json.load(open(test_payload_path))
+    payload["messages"][0]["content"] = "Hello"
+
+    response = test_client.post("/v1/query", json=payload)
+    assert response.status_code == 200
+    
+    # Should NOT have any function calls for get_widget_data
+    response_text = response.text
+    assert "get_widget_data" not in response_text
+    assert "copilotFunctionCall" not in response_text
+    
+    # Should only have messages listing widgets
+    CopilotResponse(response.text).has_any("copilotMessage")

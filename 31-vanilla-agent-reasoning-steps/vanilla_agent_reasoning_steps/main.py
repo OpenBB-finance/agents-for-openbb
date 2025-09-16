@@ -21,7 +21,7 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://pro.openbb.co"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -100,13 +100,6 @@ async def query(request: QueryRequest) -> EventSourceResponse:
             # Actually stream the LLM response to the client.
             if chunk := event.choices[0].delta.content:
                 yield message_chunk(chunk).model_dump()
-
-        # Reasoning steps can be yielded from anywhere, as long as they are
-        # yielded from the execution loop back to the OpenBB Workspace.
-        yield reasoning_step(
-            event_type="INFO",
-            message="Answering complete!",
-        ).model_dump()
 
     return EventSourceResponse(
         content=execution_loop(),

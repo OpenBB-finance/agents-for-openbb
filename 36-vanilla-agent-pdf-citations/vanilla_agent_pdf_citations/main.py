@@ -107,7 +107,9 @@ async def query(request: QueryRequest) -> EventSourceResponse:
 
     context_str = ""
     citations_list: list[Citation] = []
-    pdf_text_positions: List[Dict[str, Any]] = []  # Store PDF text positions for citation
+    pdf_text_positions: List[
+        Dict[str, Any]
+    ] = []  # Store PDF text positions for citation
     for index, message in enumerate(request.messages):
         if message.role == "human":
             openai_messages.append(
@@ -133,7 +135,8 @@ async def query(request: QueryRequest) -> EventSourceResponse:
             for widget_data_request in message.input_arguments["data_sources"]:
                 # Find matching widget
                 matching_widgets = [
-                    w for w in request.widgets.primary
+                    w
+                    for w in request.widgets.primary
                     if str(w.uuid) == widget_data_request["widget_uuid"]
                 ]
 
@@ -148,7 +151,7 @@ async def query(request: QueryRequest) -> EventSourceResponse:
                     input_arguments=widget_data_request["input_args"],
                 )
                 citations_list.append(basic_citation)
-                
+
                 # Citation 2: Highlight first sentence from PDF
                 # This is how you reference a specific sentence
                 if pdf_text_positions and len(pdf_text_positions) > 0:
@@ -158,22 +161,24 @@ async def query(request: QueryRequest) -> EventSourceResponse:
                         widget=widget,
                         input_arguments=widget_data_request["input_args"],
                         extra_details={
-                            "Page": first_line['page'],
-                            "Reference": "First sentence of document"
+                            "Page": first_line["page"],
+                            "Reference": "First sentence of document",
                         },
                     )
 
                     # Add highlighting for the first sentence
-                    pdf_citation.quote_bounding_boxes = [[
-                        CitationHighlightBoundingBox(
-                            text=first_line['text'][:100],
-                            page=first_line['page'],
-                            x0=first_line['x0'],
-                            top=first_line['top'],
-                            x1=first_line['x1'],
-                            bottom=first_line['bottom']
-                        )
-                    ]]
+                    pdf_citation.quote_bounding_boxes = [
+                        [
+                            CitationHighlightBoundingBox(
+                                text=first_line["text"][:100],
+                                page=first_line["page"],
+                                x0=first_line["x0"],
+                                top=first_line["top"],
+                                x1=first_line["x1"],
+                                bottom=first_line["bottom"],
+                            )
+                        ]
+                    ]
 
                     citations_list.append(pdf_citation)
 
@@ -223,26 +228,28 @@ def extract_pdf_with_positions(pdf_bytes: bytes) -> Tuple[str, List[Dict[str, An
                 # Group characters into lines
                 lines = {}
                 for char in page.chars:
-                    y = round(char['top'])  # Round to group by line
+                    y = round(char["top"])  # Round to group by line
                     if y not in lines:
-                        lines[y] = {'chars': [], 'x0': char['x0'], 'x1': char['x1']}
-                    lines[y]['chars'].append(char['text'])
-                    lines[y]['x0'] = min(lines[y]['x0'], char['x0'])
-                    lines[y]['x1'] = max(lines[y]['x1'], char['x1'])
+                        lines[y] = {"chars": [], "x0": char["x0"], "x1": char["x1"]}
+                    lines[y]["chars"].append(char["text"])
+                    lines[y]["x0"] = min(lines[y]["x0"], char["x0"])
+                    lines[y]["x1"] = max(lines[y]["x1"], char["x1"])
 
                 # Get first non-empty line for citation
                 sorted_lines = sorted(lines.items())
                 for y_pos, line_data in sorted_lines[:5]:  # Check first 5 lines
-                    line_text = ''.join(line_data['chars']).strip()
+                    line_text = "".join(line_data["chars"]).strip()
                     if line_text and len(line_text) > 10:  # Skip very short lines
-                        text_positions.append({
-                            'text': line_text,
-                            'page': page_num,
-                            'x0': line_data['x0'],
-                            'top': y_pos,
-                            'x1': line_data['x1'],
-                            'bottom': y_pos + 12  # Standard line height
-                        })
+                        text_positions.append(
+                            {
+                                "text": line_text,
+                                "page": page_num,
+                                "x0": line_data["x0"],
+                                "top": y_pos,
+                                "x1": line_data["x1"],
+                                "bottom": y_pos + 12,  # Standard line height
+                            }
+                        )
                         break  # Just get the first meaningful line
 
             # Also extract full text for context
@@ -254,19 +261,23 @@ def extract_pdf_with_positions(pdf_bytes: bytes) -> Tuple[str, List[Dict[str, An
 
 
 # Files can either be served from a URL...
-async def _get_url_pdf_text(data: SingleFileReference) -> Tuple[str, List[Dict[str, Any]]]:
+async def _get_url_pdf_text(
+    data: SingleFileReference,
+) -> Tuple[str, List[Dict[str, Any]]]:
     file_content = await _download_file(str(data.url))
     return extract_pdf_with_positions(file_content)
 
 
 # ... or via base64 encoding.
-async def _get_base64_pdf_text(data: SingleDataContent) -> Tuple[str, List[Dict[str, Any]]]:
+async def _get_base64_pdf_text(
+    data: SingleDataContent,
+) -> Tuple[str, List[Dict[str, Any]]]:
     file_content = base64.b64decode(data.content)
     return extract_pdf_with_positions(file_content)
 
 
 async def handle_widget_data(
-    data: list[DataContent | DataFileReferences]
+    data: list[DataContent | DataFileReferences],
 ) -> Tuple[str, List[Dict[str, Any]]]:
     """Process widget data and extract PDF text with positions if applicable.
 
@@ -297,5 +308,5 @@ async def handle_widget_data(
                 # string.
                 result_str += f"{item.content}\n"
             result_str += "------\n"
-    
+
     return result_str, all_positions

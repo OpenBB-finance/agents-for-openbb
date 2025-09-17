@@ -42,7 +42,7 @@ If you prefer diving straight into code, we have a growing list of examples of c
 
 - [A vanilla agent that can handle PDF data and add citations in the document](./36-vanilla-agent-pdf-citations)
 
-<img width="2380" height="2038" alt="CleanShot 2025-09-17 at 17 10 39@2x" src="https://github.com/user-attachments/assets/dfd981ad-6371-4aa2-961d-bb404546582a" />
+<img width="600" height="2038" alt="CleanShot 2025-09-17 at 17 10 39@2x" src="https://github.com/user-attachments/assets/dfd981ad-6371-4aa2-961d-bb404546582a" />
 
 - [A vanilla agent that can access widgets on the dashboard](./36-vanilla-agent-dashboard-widgets)
 

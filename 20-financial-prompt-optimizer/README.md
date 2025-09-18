@@ -17,36 +17,35 @@ Python, as well as your OpenAI API key.
 
 1. Clone this repository to your local machine.
 
-2. Set the OpenAI API key as an environment variable in your .bashrc or .zshrc file:
+2. Install the necessary dependencies:
 
-    ``` sh
-    # in .zshrc or .bashrc
+    ```sh
+    poetry install --no-root
+    ```
+
+3. Set the OpenAI API key as an environment variable:
+
+    ```sh
     export OPENAI_API_KEY=<your-api-key>
     ```
 
-3. Install the necessary dependencies:
-
-``` sh
-poetry install --no-root
-```
-
 4. Start the API server:
 
-``` sh
-cd financial-prompt-optimizer
-poetry run uvicorn main:app --port 7777 --reload
-```
+    ```sh
+    cd financial-prompt-optimizer
+    poetry run uvicorn main:app --port 7777 --reload
+    ```
 
 This command runs the FastAPI application, making it accessible on your network.
 
 ### Accessing the Documentation
 
 Once the API server is running, you can view the documentation and interact with
-the API by visiting: http://localhost:7777/docs
+the API by visiting: [http://localhost:7777/docs](http://localhost:7777/docs)
 
 ### Using with OpenBB Workspace (Optional)
 
-- The agent descriptor is available at: http://localhost:7777/agents.json
+- The agent descriptor is available at: [http://localhost:7777/agents.json](http://localhost:7777/agents.json)
 - Features are set to:
   - `streaming: true`
   - `widget-dashboard-select: false`
@@ -59,4 +58,3 @@ sections:
 
 - `Optimized Prompt: <single improved prompt>`
 - `Rationale: <1–3 short bullets on what changed and why>`
-

@@ -1,7 +1,7 @@
 import base64
 import io
 import logging
-from typing import AsyncGenerator, List, Tuple, Dict, Any
+from typing import Any, AsyncGenerator, Dict, List, Tuple
 
 import httpx
 import openai
@@ -15,7 +15,7 @@ from openai.types.chat import (
     ChatCompletionSystemMessageParam,
     ChatCompletionUserMessageParam,
 )
-from openbb_ai import cite, citations, get_widget_data, message_chunk
+from openbb_ai import citations, cite, get_widget_data, message_chunk
 from openbb_ai.models import (
     Citation,
     CitationCollectionSSE,
@@ -55,7 +55,7 @@ def get_copilot_description():
                 "name": "Vanilla Agent PDF Citations",
                 "description": "A vanilla agent that handles PDF data with citation support.",
                 "image": "https://github.com/OpenBB-finance/copilot-for-terminal-pro/assets/14093308/7da2a512-93b9-478d-90bc-b8c3dd0cabcf",
-                "endpoints": {"query": "http://localhost:7777/v1/query"},
+                "endpoints": {"query": "/v1/query"},
                 "features": {
                     "streaming": True,
                     "widget-dashboard-select": True,
@@ -72,8 +72,12 @@ async def query(request: QueryRequest) -> EventSourceResponse:
 
     # We only automatically fetch widget data if the last message is from a
     # human, and widgets have been explicitly added to the request.
+    last_message = request.messages[-1]
+    orchestration_requested = (
+        last_message.role == "ai" and last_message.agent_id == "openbb-copilot"
+    )
     if (
-        request.messages[-1].role == "human"
+        (last_message.role == "human" or orchestration_requested)
         and request.widgets
         and request.widgets.primary
     ):

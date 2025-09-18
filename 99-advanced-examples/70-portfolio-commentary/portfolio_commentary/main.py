@@ -1,37 +1,37 @@
 import json
 import logging
 import os
+import uuid
 from pathlib import Path
-import httpx
 from typing import AsyncGenerator, Callable
+
+import httpx
+from common.agent import get_remote_data, reasoning_step, remote_function_call
+from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from magentic import (
+    AssistantMessage,
     AsyncStreamedStr,
     Chat,
     FunctionCall,
     FunctionResultMessage,
-    AssistantMessage,
     SystemMessage,
     UserMessage,
+)
+from openbb_ai.models import (
+    DataContent,
+    FunctionCallSSE,
+    FunctionCallSSEData,
+    QueryRequest,
+    StatusUpdateSSE,
+    Widget,
+    WidgetCollection,
 )
 from sse_starlette.sse import EventSourceResponse
 
 from .prompts import SYSTEM_PROMPT
-
-from dotenv import load_dotenv
-from common.agent import reasoning_step, remote_function_call, get_remote_data
-from openbb_ai.models import (
-    QueryRequest,
-    StatusUpdateSSE,
-    DataContent,
-    FunctionCallSSE,
-    FunctionCallSSEData,
-    WidgetCollection,
-    Widget,
-)
-import uuid
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

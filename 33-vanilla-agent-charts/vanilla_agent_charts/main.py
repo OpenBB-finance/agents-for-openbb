@@ -1,21 +1,18 @@
 from typing import AsyncGenerator
-import openai
 
+import openai
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from sse_starlette.sse import EventSourceResponse
-
-from openbb_ai.models import MessageChunkSSE, QueryRequest
-from openbb_ai import message_chunk, chart
-
 from openai.types.chat import (
-    ChatCompletionMessageParam,
-    ChatCompletionUserMessageParam,
     ChatCompletionAssistantMessageParam,
+    ChatCompletionMessageParam,
     ChatCompletionSystemMessageParam,
+    ChatCompletionUserMessageParam,
 )
-
+from openbb_ai import chart, message_chunk
+from openbb_ai.models import MessageChunkSSE, QueryRequest
+from sse_starlette.sse import EventSourceResponse
 
 app = FastAPI()
 
@@ -37,7 +34,7 @@ def get_copilot_description():
                 "name": "Vanilla Agent Charts",
                 "description": "A vanilla agent that can produce charts as part of its response.",
                 "image": "https://github.com/OpenBB-finance/copilot-for-terminal-pro/assets/14093308/7da2a512-93b9-478d-90bc-b8c3dd0cabcf",
-                "endpoints": {"query": "http://localhost:7777/v1/query"},
+                "endpoints": {"query": "/v1/query"},
                 "features": {
                     "streaming": True,
                     "widget-dashboard-select": True,

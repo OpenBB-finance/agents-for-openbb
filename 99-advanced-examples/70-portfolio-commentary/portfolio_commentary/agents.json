@@ -4,7 +4,7 @@
 		"description": "A powerful AI assistant powered by DeepSeek that analyzes your portfolio data and provides insightful commentary. It can access your financial widgets, interpret market trends, and incorporate the latest news and information from the web through Perplexity to deliver comprehensive portfolio insights.",
 		"image": "https://raw.githubusercontent.com/OpenBB-finance/copilot-for-openbb/port-commentary/portfolio-commentary/portfolio_commentary/copilot_img.png",
 		"endpoints": {
-			"query": "http://localhost:7777/v1/query"
+			"query": "/v1/query"
 		},
 		"features": {
 			"streaming": true,

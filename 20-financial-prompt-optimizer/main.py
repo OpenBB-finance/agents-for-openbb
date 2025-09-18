@@ -7,7 +7,7 @@ from fastapi.responses import JSONResponse
 from sse_starlette.sse import EventSourceResponse
 
 from openbb_ai.models import MessageChunkSSE, QueryRequest
-from openbb_ai import reasoning_step, message_chunk
+from openbb_ai import message_chunk
 
 from openai.types.chat import (
     ChatCompletionMessageParam,
@@ -30,12 +30,12 @@ app.add_middleware(
 
 @app.get("/agents.json")
 def get_copilot_description():
-    """Widgets configuration file for the OpenBB Terminal Pro"""
+    """Agent descriptor for the OpenBB Workspace."""
     return JSONResponse(
         content={
-            "vanilla_agent_reasoning_steps": {
-                "name": "Vanilla Agent Reasoning Steps",
-                "description": "A vanilla agent that returns reasoning steps to the OpenBB Workspace.",
+            "financial_prompt_optimizer": {
+                "name": "Financial Prompt Optimizer",
+                "description": "Optimizes a user's prompt for finance: clearer, more specific, and actionable.",
                 "image": "https://github.com/OpenBB-finance/copilot-for-terminal-pro/assets/14093308/7da2a512-93b9-478d-90bc-b8c3dd0cabcf",
                 "endpoints": {"query": "http://localhost:7777/v1/query"},
                 "features": {
@@ -50,13 +50,17 @@ def get_copilot_description():
 
 @app.post("/v1/query")
 async def query(request: QueryRequest) -> EventSourceResponse:
-    """Query the Copilot."""
+    """Stream a concise optimized prompt and rationale."""
 
-    # Format the messages into a list of OpenAI messages
     openai_messages: list[ChatCompletionMessageParam] = [
         ChatCompletionSystemMessageParam(
             role="system",
-            content="You are a helpful financial assistant. Your name is 'Vanilla Agent'.",
+            content=(
+                "You are a concise Financial Prompt Optimizer.\n"
+                "Rewrite the user's prompt to be clearer, more specific, and immediately actionable for financial analysis.\n"
+                "Always return exactly the improved prompt:\n"
+                "Optimized Prompt: <detailed improved prompt with step-by-step>\n"
+            ),
         )
     ]
 
@@ -65,43 +69,32 @@ async def query(request: QueryRequest) -> EventSourceResponse:
             openai_messages.append(
                 ChatCompletionUserMessageParam(role="user", content=message.content)
             )
-        elif message.role == "ai":
-            if isinstance(message.content, str):
-                openai_messages.append(
-                    ChatCompletionAssistantMessageParam(
-                        role="assistant", content=message.content
-                    )
+        elif message.role == "ai" and isinstance(message.content, str):
+            openai_messages.append(
+                ChatCompletionAssistantMessageParam(
+                    role="assistant", content=message.content
                 )
+            )
 
-    # Define the execution loop.
     async def execution_loop() -> AsyncGenerator[MessageChunkSSE, None]:
-        # To send a reasoning step to the OpenBB Workspace, you yield the result
-        # of the reasoning_step function from anywhere inside the execution
-        # loop.
-        yield reasoning_step(
-            event_type="INFO",  # Can also be "WARNING" or "ERROR"
-            message="Starting to answer the question...",
-        ).model_dump()
-
-        # Reasoning steps can also include a table of key-value
-        # pairs that will be displayed in the OpenBB Workspace.
-        yield reasoning_step(
-            event_type="INFO",
-            message="An example of a reasoning step with details.",
-            details={"key1": "value1", "key2": "value2"},
-        ).model_dump()
-
         client = openai.AsyncOpenAI()
         async for event in await client.chat.completions.create(
             model="gpt-4o",
             messages=openai_messages,
             stream=True,
         ):
-            # Actually stream the LLM response to the client.
             if chunk := event.choices[0].delta.content:
-                yield message_chunk(chunk).model_dump()
+                yield message_chunk(chunk)
 
     return EventSourceResponse(
-        content=execution_loop(),
+        content=(
+            event.model_dump(exclude_none=True) async for event in execution_loop()
+        ),
         media_type="text/event-stream",
     )
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run("main:app", host="0.0.0.0", port=7777, reload=True)

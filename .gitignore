@@ -1,5 +1,7 @@
 __pycache__/
 /.env
+venv
+.venv
 *.DS_Store
 *pycache*
 *.ruff_cache

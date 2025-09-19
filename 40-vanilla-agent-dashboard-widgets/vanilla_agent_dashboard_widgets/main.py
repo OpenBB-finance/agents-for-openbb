@@ -1,11 +1,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from sse_starlette.sse import EventSourceResponse
-
-from openbb_ai.models import QueryRequest
 from openbb_ai import message_chunk
-
+from openbb_ai.models import QueryRequest
+from sse_starlette.sse import EventSourceResponse
 
 app = FastAPI()
 
@@ -27,7 +25,7 @@ def get_copilot_description():
                 "name": "Vanilla Agent Dashboard Widgets",
                 "description": "Lists dashboard widgets and retrieves data from the first widget on the dashboard (if any).",
                 "image": "https://github.com/OpenBB-finance/copilot-for-terminal-pro/assets/14093308/7da2a512-93b9-478d-90bc-b8c3dd0cabcf",
-                "endpoints": {"query": "http://localhost:7777/v1/query"},
+                "endpoints": {"query": "/v1/query"},
                 "features": {
                     "streaming": True,
                     "widget-dashboard-select": True,

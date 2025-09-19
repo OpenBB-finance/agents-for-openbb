@@ -1,21 +1,18 @@
 from typing import AsyncGenerator
-import openai
 
+import openai
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from sse_starlette.sse import EventSourceResponse
-
-from openbb_ai.models import MessageChunkSSE, QueryRequest
-from openbb_ai import reasoning_step, message_chunk
-
 from openai.types.chat import (
-    ChatCompletionMessageParam,
-    ChatCompletionUserMessageParam,
     ChatCompletionAssistantMessageParam,
+    ChatCompletionMessageParam,
     ChatCompletionSystemMessageParam,
+    ChatCompletionUserMessageParam,
 )
-
+from openbb_ai import message_chunk, reasoning_step
+from openbb_ai.models import MessageChunkSSE, QueryRequest
+from sse_starlette.sse import EventSourceResponse
 
 app = FastAPI()
 
@@ -37,14 +34,14 @@ def get_copilot_description():
                 "name": "Vanilla Agent Reasoning Steps",
                 "description": "A vanilla agent that returns reasoning steps to the OpenBB Workspace.",
                 "image": "https://github.com/OpenBB-finance/copilot-for-terminal-pro/assets/14093308/7da2a512-93b9-478d-90bc-b8c3dd0cabcf",
-                "endpoints": {"query": "http://localhost:7777/v1/query"},
+                "endpoints": {"query": "/v1/query"},
                 "features": {
                     "streaming": True,
                     "widget-dashboard-select": False,
                     "widget-dashboard-search": False,
                 },
             }
-        }
+        },
     )
 
 

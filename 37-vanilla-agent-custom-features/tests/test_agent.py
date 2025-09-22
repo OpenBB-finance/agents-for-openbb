@@ -33,8 +33,8 @@ def test_agents_json():
     assert agent_config["name"] == "Vanilla Agent Custom Features"
     assert "deep-research" in agent_config["features"]
     assert "web-search" in agent_config["features"]
-    assert agent_config["features"]["deep-research"]["default"] == False
-    assert agent_config["features"]["web-search"]["default"] == True
+    assert not agent_config["features"]["deep-research"]["default"]
+    assert agent_config["features"]["web-search"]["default"]
 
 
 def test_query_simple_message():

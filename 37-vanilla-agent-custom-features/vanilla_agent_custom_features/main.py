@@ -33,7 +33,10 @@ def get_copilot_description():
             "vanilla_agent_custom_features": {
                 "name": "Vanilla Agent Custom Features",
                 "description": "A simple agent that reports its feature status.",
-                "image": "https://github.com/OpenBB-finance/copilot-for-terminal-pro/assets/14093308/7da2a512-93b9-478d-90bc-b8c3dd0cabcf",
+                "image": (
+                    "https://github.com/OpenBB-finance/copilot-for-terminal-pro/"
+                    "assets/14093308/7da2a512-93b9-478d-90bc-b8c3dd0cabcf"
+                ),
                 "endpoints": {"query": "/v1/query"},
                 "features": {
                     "streaming": True,
@@ -59,14 +62,27 @@ def get_copilot_description():
 async def query(request: QueryRequest) -> EventSourceResponse:
     """Stream a simple greeting with feature status."""
 
+    # Check workspace_options from request payload
+    # workspace_options is a list like ["web-search"] or ["deep-research", "web-search"]
+    workspace_options = getattr(request, "workspace_options", [])
+    
+    # Check which features are enabled
+    deep_research_enabled = "deep-research" in workspace_options
+    web_search_enabled = "web-search" in workspace_options
+    
+    # Build the feature status message
+    features_msg = (
+        f"- Deep Research: {'✅ Enabled' if deep_research_enabled else '❌ Disabled'}\n"
+        f"- Web Search: {'✅ Enabled' if web_search_enabled else '❌ Disabled'}"
+    )
+
     openai_messages: list[ChatCompletionMessageParam] = [
         ChatCompletionSystemMessageParam(
             role="system",
             content=(
                 "You are a simple greeting agent.\n"
-                "Greet the user and let them know:\n"
-                "- Deep Research is disabled\n"
-                "- Web Search is enabled\n"
+                "Greet the user and let them know their current feature settings:\n"
+                f"{features_msg}\n"
                 "Keep your response brief and friendly."
             ),
         )
@@ -100,3 +116,4 @@ async def query(request: QueryRequest) -> EventSourceResponse:
         ),
         media_type="text/event-stream",
     )
+

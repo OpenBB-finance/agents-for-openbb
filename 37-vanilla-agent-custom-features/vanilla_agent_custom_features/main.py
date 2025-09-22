@@ -65,11 +65,11 @@ async def query(request: QueryRequest) -> EventSourceResponse:
     # Check workspace_options from request payload
     # workspace_options is a list like ["web-search"] or ["deep-research", "web-search"]
     workspace_options = getattr(request, "workspace_options", [])
-    
+
     # Check which features are enabled
     deep_research_enabled = "deep-research" in workspace_options
     web_search_enabled = "web-search" in workspace_options
-    
+
     # Build the feature status message
     features_msg = (
         f"- Deep Research: {'✅ Enabled' if deep_research_enabled else '❌ Disabled'}\n"
@@ -116,4 +116,3 @@ async def query(request: QueryRequest) -> EventSourceResponse:
         ),
         media_type="text/event-stream",
     )
-

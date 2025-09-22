@@ -25,10 +25,10 @@ def test_agents_json():
     """Test that the agents.json endpoint returns the correct configuration."""
     response = test_client.get("/agents.json")
     assert response.status_code == 200
-    
+
     data = response.json()
     assert "vanilla_agent_custom_features" in data
-    
+
     agent_config = data["vanilla_agent_custom_features"]
     assert agent_config["name"] == "Vanilla Agent Custom Features"
     assert "deep-research" in agent_config["features"]
@@ -56,85 +56,74 @@ def test_query_simple_message():
 def test_query_with_workspace_options():
     """Test query with workspace options to verify feature detection."""
     test_payload = {
-        "messages": [
-            {
-                "role": "human",
-                "content": "Hello, what features are enabled?"
-            }
-        ],
-        "workspace_options": {
-            "deep-research": True,
-            "web-search": False
-        }
+        "messages": [{"role": "human", "content": "Hello, what features are enabled?"}],
+        "workspace_options": {"deep-research": True, "web-search": False},
     }
-    
+
     with mock.patch("openai.AsyncOpenAI") as mock_openai:
         # Mock the OpenAI client
         mock_client = mock.MagicMock()
         mock_openai.return_value = mock_client
-        
+
         # Verify that the system message contains the correct feature status
         async def mock_create(**kwargs):
             messages = kwargs["messages"]
             system_message = messages[0]["content"]
-            
+
             # Check that the system message contains the feature status
             assert "Deep Research: ✅ Enabled" in system_message
             assert "Web Search: ❌ Disabled" in system_message
-            
+
             # Return a mock stream
             class MockEvent:
                 class Choice:
                     class Delta:
                         content = "Hello! Features are configured."
+
                     delta = Delta()
+
                 choices = [Choice()]
-            
+
             yield MockEvent()
-        
+
         mock_client.chat.completions.create = mock_create
-        
+
         response = test_client.post("/v1/query", json=test_payload)
         assert response.status_code == 200
 
 
 def test_query_default_workspace_options():
     """Test query without workspace options uses defaults."""
-    test_payload = {
-        "messages": [
-            {
-                "role": "human", 
-                "content": "Hi there!"
-            }
-        ]
-    }
-    
+    test_payload = {"messages": [{"role": "human", "content": "Hi there!"}]}
+
     with mock.patch("openai.AsyncOpenAI") as mock_openai:
         # Mock the OpenAI client
         mock_client = mock.MagicMock()
         mock_openai.return_value = mock_client
-        
+
         # Verify that the system message contains the default feature status
         async def mock_create(**kwargs):
             messages = kwargs["messages"]
             system_message = messages[0]["content"]
-            
+
             # Check that defaults are used (deep-research: False, web-search: True)
             assert "Deep Research: ❌ Disabled" in system_message
             assert "Web Search: ✅ Enabled" in system_message
-            
+
             # Return a mock stream
             class MockEvent:
                 class Choice:
                     class Delta:
                         content = "Hello!"
+
                     delta = Delta()
+
                 choices = [Choice()]
-            
+
             yield MockEvent()
-        
+
         mock_client.chat.completions.create = mock_create
-        
+
         response = test_client.post("/v1/query", json=test_payload)
         assert response.status_code == 200
 

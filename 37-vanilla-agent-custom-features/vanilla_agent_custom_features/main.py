@@ -39,6 +39,16 @@ def get_copilot_description():
                     "streaming": True,
                     "widget-dashboard-select": False,
                     "widget-dashboard-search": False,
+                    "deep-research": {
+                        "label": "Deep Research",
+                        "default": False,
+                        "description": "Allows the copilot to do deep research",
+                    },
+                    "web-search": {
+                        "label": "Web Search",
+                        "default": True,
+                        "description": "Allows the copilot to search the web.",
+                    },
                 },
             }
         }

@@ -15,7 +15,7 @@ A sophisticated AI-powered portfolio analysis agent built for OpenBB Workspace. 
 
 1. **Clone and navigate to the project:**
 ```bash
-cd 99-advanced-examples/70-portfolio-commentary
+cd 99-advanced-examples/portfolio-commentary-with-search-feature
 ```
 
 2. **Create environment file:**

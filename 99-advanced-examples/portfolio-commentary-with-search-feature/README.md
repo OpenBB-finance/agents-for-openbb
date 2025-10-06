@@ -2,6 +2,8 @@
 
 A sophisticated AI-powered portfolio analysis agent built for OpenBB Workspace. This agent provides intelligent commentary and insights on portfolio performance, allocation, and risk metrics by analyzing widget data from your dashboard.
 
+<img width="2878" height="2026" alt="CleanShot 2025-10-06 at 18 18 36@2x" src="https://github.com/user-attachments/assets/1b813083-0dda-4004-8cfa-2f5a2c337bdb" />
+
 ## Getting Started
 
 ### Prerequisites

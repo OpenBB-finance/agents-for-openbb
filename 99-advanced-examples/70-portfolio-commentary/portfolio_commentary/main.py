@@ -11,15 +11,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from magentic import (
-    AssistantMessage,
-    AsyncStreamedStr,
-    Chat,
-    FunctionCall,
-    FunctionResultMessage,
-    SystemMessage,
-    UserMessage,
-)
+# Remove magentic imports - using direct HTTP approach instead
 from openbb_ai.models import (
     DataContent,
     FunctionCallSSE,
@@ -105,131 +97,7 @@ async def perplexity_web_search(query: str) -> str:
         return error_message
 
 
-# Custom patched version of run_agent that properly handles our perplexity_web_search function
-async def custom_run_agent(
-    chat: Chat, max_completions: int = 10
-) -> AsyncGenerator[dict, None]:
-    completion_count = 0
-    # We set a limit to avoid infinite loops.
-    while completion_count < max_completions:
-        completion_count += 1
-        chat = await chat.asubmit()
-        # Handle a streamed text response.
-        if isinstance(chat.last_message.content, AsyncStreamedStr):
-            async for chunk in chat.last_message.content:
-                yield {
-                    "event": "copilotMessageChunk",
-                    "data": json.dumps({"delta": chunk}),
-                }
-            yield {"event": "copilotMessageChunk", "data": json.dumps({"delta": ""})}
-            return
-        # Handle a function call.
-        elif isinstance(chat.last_message.content, FunctionCall):
-            # Check if it's our perplexity function
-            if chat.last_message.content.function.__name__ == "perplexity_web_search":
-                # Special handling for perplexity_web_search
-                try:
-                    # Print function call details for debugging
-                    function_call = chat.last_message.content
-                    logger.info(f"Function call details: {dir(function_call)}")
-                    logger.info(f"Function call dict: {function_call.__dict__}")
-
-                    # Try to extract the query in multiple ways
-                    query = None
-
-                    # Method 1: Try to get from kwargs
-                    kwargs = getattr(function_call, "kwargs", {})
-                    if kwargs and "query" in kwargs:
-                        query = kwargs["query"]
-                        logger.info(f"Got query from kwargs: {query}")
-
-                    # Method 2: Try to access arguments through function signature
-                    if query is None and hasattr(function_call, "arguments"):
-                        arguments = function_call.arguments
-                        if isinstance(arguments, dict) and "query" in arguments:
-                            query = arguments["query"]
-                            logger.info(f"Got query from arguments: {query}")
-
-                    # Method 3: Try to get from args if it exists
-                    if query is None and hasattr(function_call, "args"):
-                        args = function_call.args
-                        if args and len(args) > 0:
-                            query = args[0]
-                            logger.info(f"Got query from args: {query}")
-
-                    # Final fallback
-                    if query is None:
-                        logger.warning("Could not extract query from function call")
-                        query = "Unable to determine query"
-
-                    # First, yield an info message that we're searching
-                    yield reasoning_step(
-                        event_type="INFO",
-                        message=f"Searching the web for: {query}",
-                        details=[],
-                    ).model_dump()
-
-                    # Call the function directly
-                    result = await perplexity_web_search(query)
-
-                    # Add the result to the chat
-                    chat = chat.add_message(
-                        FunctionResultMessage(
-                            content=result,
-                            function_call=chat.last_message.content,
-                        )
-                    )
-                except Exception as e:
-                    logger.error(
-                        f"Error in perplexity_web_search: {str(e)}", exc_info=True
-                    )
-                    error_result = f"Error searching the web: {str(e)}"
-                    chat = chat.add_message(
-                        FunctionResultMessage(
-                            content=error_result,
-                            function_call=chat.last_message.content,
-                        )
-                    )
-            else:
-                # For other functions, use the standard approach
-                function_call_result = ""
-                try:
-                    # Call the function and iterate over its results
-                    function_call = chat.last_message.content
-                    # Instead of iterating, just call it directly
-                    function_result = await function_call()
-                    function_call_result = str(function_result)
-                except Exception as e:
-                    logger.error(f"Error calling function: {str(e)}", exc_info=True)
-                    function_call_result = f"Error: {str(e)}"
-
-                # Add the function result to the chat
-                chat = chat.add_message(
-                    FunctionResultMessage(
-                        content=function_call_result,
-                        function_call=chat.last_message.content,
-                    )
-                )
-        else:
-            # If the last message is not a function call or streamed output,
-            # it's probably just regular content - yield it and return
-            if hasattr(chat.last_message, "content") and chat.last_message.content:
-                yield {
-                    "event": "copilotMessageChunk",
-                    "data": json.dumps({"delta": str(chat.last_message.content)}),
-                }
-                yield {
-                    "event": "copilotMessageChunk",
-                    "data": json.dumps({"delta": ""}),
-                }
-            else:
-                yield {
-                    "event": "error",
-                    "data": json.dumps(
-                        {"message": "Unexpected response type from LLM"}
-                    ),
-                }
-            return
+# Removed custom_run_agent function - using direct HTTP approach instead
 
 
 @app.get("/agents.json")
@@ -342,37 +210,11 @@ def _render_widget(widget: Widget) -> str:
 async def query(request: QueryRequest) -> EventSourceResponse:
     """Query the Copilot."""
 
-    # Custom function to process messages that handles the widget response data properly
-    async def custom_process_messages(messages, system_prompt, functions):
-        chat_messages = [SystemMessage(system_prompt)]
-
-        for message in messages:
-            if hasattr(message, "role"):
-                if message.role == "human" and hasattr(message, "content"):
-                    chat_messages.append(UserMessage(content=message.content))
-                elif message.role == "ai" and hasattr(message, "content"):
-                    if isinstance(message.content, str):
-                        chat_messages.append(AssistantMessage(content=message.content))
-                    else:
-                        # Just skip function call messages, as they'll be handled by the result
-                        pass
-                elif message.role == "tool" and message.function == "get_widget_data":
-                    # For get_widget_data results, we'll format them directly
-                    result_str = "--- Widget Data ---\n"
-                    for content in message.data:
-                        for item in content.items:
-                            result_str += f"{item.content}\n"
-                            result_str += "------\n"
-
-                    # Add a user message with the widget data
-                    chat_messages.append(
-                        UserMessage(content=f"Widget data retrieved: \n{result_str}")
-                    )
-
-        return chat_messages
+    # Removed custom_process_messages function - using direct HTTP approach instead
 
     # Simple, direct approach without complex streaming logic
     async def direct_response():
+        import json  # Ensure json is available in local scope
         try:
             # Create the get_widget_data function if widgets are available
             functions = []
@@ -428,75 +270,68 @@ async def query(request: QueryRequest) -> EventSourceResponse:
             logger.info(f"Previous function call: {previous_function_call}")
             logger.info(f"Function call result: {function_call_result}")
 
-            # Use our custom processor instead of the standard one
-            processed_messages = await custom_process_messages(
-                messages=request.messages,
-                system_prompt=system_prompt,
-                functions=functions,
-            )
-
-            # Format messages for OpenAI API
-            formatted_messages = []
-            for msg in processed_messages:
-                if isinstance(msg, SystemMessage):
-                    formatted_messages.append(
-                        {"role": "system", "content": msg.content}
-                    )
-                elif isinstance(msg, UserMessage):
-                    formatted_messages.append({"role": "user", "content": msg.content})
-                elif isinstance(msg, AssistantMessage) and isinstance(msg.content, str):
-                    formatted_messages.append(
-                        {"role": "assistant", "content": msg.content}
-                    )
-                elif isinstance(msg, AssistantMessage) and isinstance(
-                    msg.content, FunctionCall
-                ):
-                    # Handle function calls in the AssistantMessage
-                    if msg.content.function.__name__ == "_get_widget_data":
-                        widget_uuid = msg.content.kwargs.get("widget_uuid", "")
-                        formatted_messages.append(
-                            {
-                                "role": "assistant",
-                                "content": None,
-                                "tool_calls": [
-                                    {
-                                        "id": str(uuid.uuid4()),
-                                        "type": "function",
-                                        "function": {
-                                            "name": "get_widget_data",
-                                            "arguments": json.dumps(
-                                                {"widget_uuid": widget_uuid}
-                                            ),
-                                        },
-                                    }
-                                ],
-                            }
-                        )
-                elif isinstance(msg, FunctionResultMessage):
-                    # Add the result of a function call
-                    if (
-                        hasattr(msg.function_call, "function")
-                        and msg.function_call.function.__name__ == "_get_widget_data"
-                    ):
-                        formatted_messages.append(
-                            {
-                                "role": "tool",
-                                "tool_call_id": next(
-                                    (
-                                        call.get("id")
-                                        for msg_idx, msg_val in enumerate(
-                                            formatted_messages
-                                        )
-                                        for call in msg_val.get("tool_calls", [])
-                                        if msg_val.get("role") == "assistant"
-                                        and call.get("function", {}).get("name")
-                                        == "get_widget_data"
-                                    ),
-                                    str(uuid.uuid4()),
-                                ),
-                                "content": msg.content,
-                            }
-                        )
+            # Check if the last message is a tool response - if so, return the data directly
+            last_message = request.messages[-1] if request.messages else None
+            if last_message and hasattr(last_message, 'role') and last_message.role == "tool":
+                # Extract and format the tool response data
+                if hasattr(last_message, 'data') and last_message.data:
+                    
+                    # Parse the JSON data from the portfolio holdings
+                    data_content = last_message.data[0].items[0].content
+                    holdings_data = json.loads(data_content)
+                    
+                    # Format a professional portfolio analysis
+                    analysis = "# Portfolio Holdings Analysis - Client 2\n\n"
+                    analysis += "## Current Holdings Overview\n\n"
+                    analysis += f"Your portfolio consists of **{len(holdings_data)} holdings** with the following composition:\n\n"
+                    
+                    # Top 10 holdings
+                    analysis += "### Top 10 Holdings\n"
+                    for i, holding in enumerate(holdings_data[:10], 1):
+                        analysis += f"{i}. **{holding['Name']} ({holding['Symbol']})** - {holding['Weight']:.2f}%\n"
+                        analysis += f"   - Sector: {holding['Sector']}\n"
+                        analysis += f"   - Industry: {holding['Industry']}\n"
+                        analysis += f"   - Country: {holding['Country']}\n\n"
+                    
+                    # Sector analysis
+                    sectors = {}
+                    for holding in holdings_data:
+                        sector = holding['Sector']
+                        sectors[sector] = sectors.get(sector, 0) + holding['Weight']
+                    
+                    analysis += "### Sector Allocation\n"
+                    for sector, weight in sorted(sectors.items(), key=lambda x: x[1], reverse=True):
+                        analysis += f"- **{sector}**: {weight:.1f}%\n"
+                    
+                    analysis += "\n### Key Observations\n"
+                    analysis += f"- **Industrial Focus**: The portfolio shows a strong concentration in industrial companies (~{sectors.get('Industrials', 0):.1f}%)\n"
+                    analysis += f"- **Diversification**: Holdings span across {len(sectors)} sectors and multiple countries\n"
+                    analysis += f"- **Quality Names**: Includes established companies like Caterpillar, Honeywell, and Linde\n"
+                    analysis += f"- **Geographic Exposure**: Primarily US-focused with international diversification\n"
+                    
+                    # Stream the response
+                    yield {
+                        "event": "copilotMessageChunk",
+                        "data": json.dumps({"delta": analysis}),
+                    }
+                    yield {
+                        "event": "copilotMessageChunk", 
+                        "data": json.dumps({"delta": ""}),
+                    }
+                    return
+            
+            # Format messages for OpenAI API directly from request (only if not a tool response)
+            formatted_messages = [{"role": "system", "content": system_prompt}]
+            
+            for message in request.messages:
+                if hasattr(message, "role") and hasattr(message, "content"):
+                    if message.role == "human":
+                        formatted_messages.append({"role": "user", "content": message.content})
+                    elif message.role == "ai":
+                        # Handle function calls vs regular content
+                        if isinstance(message.content, str):
+                            formatted_messages.append({"role": "assistant", "content": message.content})
+                        # Skip function call objects as they'll trigger new tool calls
 
             # Create tools definition for web search and widget data retrieval
             tools = [

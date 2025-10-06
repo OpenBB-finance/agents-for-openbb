@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import AsyncGenerator, Callable
 
 import httpx
-from common.agent import get_remote_data, reasoning_step, remote_function_call
+from openbb_ai import reasoning_step, get_widget_data
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -94,7 +94,7 @@ async def perplexity_web_search(query: str) -> str:
     }
 
     try:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(url, headers=headers, json=data)
             response.raise_for_status()
             response_json = response.json()
@@ -258,9 +258,6 @@ def get_widget_data(widget_collection: WidgetCollection) -> Callable:
         else []
     )
 
-    @remote_function_call(
-        function="get_widget_data", output_formatter=handle_widget_data
-    )
     async def _get_widget_data(
         widget_uuid: str,
     ) -> AsyncGenerator[FunctionCallSSE | StatusUpdateSSE, None]:
@@ -289,14 +286,15 @@ def get_widget_data(widget_collection: WidgetCollection) -> Callable:
             details={"widget_uuid": widget_uuid},
         )
 
-        # Request the widget data
-        yield get_remote_data(
-            widget=widget,
-            # Use the current values of widget parameters
-            input_arguments={
-                param.name: param.current_value for param in widget.params
-            },
+        # Request the widget data using the new API
+        from openbb_ai.models import WidgetRequest
+        widget_request = WidgetRequest(
+            widget_uuid=widget.uuid,
+            origin=widget.origin,
+            id=widget.widget_id,
+            input_args={param.name: param.current_value for param in widget.params},
         )
+        yield get_widget_data([widget_request]).model_dump()
 
     return _get_widget_data
 
@@ -583,7 +581,7 @@ async def query(request: QueryRequest) -> EventSourceResponse:
             logger.info(
                 f"Making initial request to detect tool calls with messages: {formatted_messages}"
             )
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.post(url, headers=headers, json=data)
                 response.raise_for_status()
                 result = response.json()

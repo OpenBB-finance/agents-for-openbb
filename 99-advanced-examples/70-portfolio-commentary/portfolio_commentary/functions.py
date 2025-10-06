@@ -1,5 +1,5 @@
 from typing import AsyncGenerator, Callable
-from common.agent import reasoning_step, get_remote_data, remote_function_call
+from openbb_ai import reasoning_step, get_widget_data
 from openbb_ai.models import (
     DataContent,
     FunctionCallSSE,
@@ -27,9 +27,6 @@ def get_widget_data(widget_collection: WidgetCollection) -> Callable:
         else []
     )
 
-    @remote_function_call(
-        function="get_widget_data", output_formatter=handle_widget_data
-    )
     async def _get_widget_data(
         widget_uuid: str,
     ) -> AsyncGenerator[FunctionCallSSE | StatusUpdateSSE, None]:
@@ -59,16 +56,14 @@ def get_widget_data(widget_collection: WidgetCollection) -> Callable:
             details={"widget_uuid": widget_uuid},
         )
 
-        # And now let's make the request to the front-end for the widget data.
-        # NB: You *must* yield using `agent.remote_data_request` from inside
-        # remote functions (i.e. those decorated with `@remote_function`).
-        yield get_remote_data(
-            widget=widget,
-            # In this example we will just re-use the currently-set values of
-            # the widget parameters.
-            input_arguments={
-                param.name: param.current_value for param in widget.params
-            },
+        # Request the widget data using the new API
+        from openbb_ai.models import WidgetRequest
+        widget_request = WidgetRequest(
+            widget_uuid=widget.uuid,
+            origin=widget.origin,
+            id=widget.widget_id,
+            input_args={param.name: param.current_value for param in widget.params},
         )
+        yield get_widget_data([widget_request]).model_dump()
 
     return _get_widget_data

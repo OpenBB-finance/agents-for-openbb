@@ -15,7 +15,9 @@ from dotenv import load_dotenv
 load_dotenv(".env")
 
 
-def get_system_prompt(perplexity_enabled: bool = False, widget_context: str = "") -> str:
+def get_system_prompt(
+    perplexity_enabled: bool = False, widget_context: str = ""
+) -> str:
     """Generate a dynamic system prompt based on available features and context."""
     base_prompt = """You are an AI assistant specializing in portfolio analysis and financial commentary. Your role is to provide clear, actionable insights based on the data provided to you.
 
@@ -104,7 +106,7 @@ async def query(request: QueryRequest) -> EventSourceResponse:
     # We only automatically fetch widget data if the last message is from a
     # human, and widgets have been explicitly added to the request (primary widgets)
     last_message = request.messages[-1] if request.messages else None
-    
+
     # Check if we should retrieve widget data (like vanilla agents)
     orchestration_requested = (
         last_message
@@ -120,23 +122,26 @@ async def query(request: QueryRequest) -> EventSourceResponse:
         # Show which widgets we're retrieving data from
         widget_names = [w.name or w.widget_id for w in request.widgets.primary]
         if len(widget_names) == 1:
-            message = f"Retrieving data from {widget_names[0]} to answer your question..."
+            message = (
+                f"Retrieving data from {widget_names[0]} to answer your question..."
+            )
         else:
             message = f"Retrieving data from {len(widget_names)} widgets: {', '.join(widget_names[:3])}{'...' if len(widget_names) > 3 else ''}"
-        
+
         async def retrieve_widget_data():
-            yield reasoning_step(
-                event_type="INFO",
-                message=message
-            ).model_dump()
-            
+            yield reasoning_step(event_type="INFO", message=message).model_dump()
+
             # Create widget requests using the OpenBB AI method (only primary widgets)
             widget_requests = []
             for widget in request.widgets.primary:
                 input_args = {}
                 try:
                     input_args = {
-                        p.name: (getattr(p, "current_value", None) if getattr(p, "current_value", None) is not None else getattr(p, "default_value", None))
+                        p.name: (
+                            getattr(p, "current_value", None)
+                            if getattr(p, "current_value", None) is not None
+                            else getattr(p, "default_value", None)
+                        )
                         for p in widget.params
                     }
                 except Exception:
@@ -148,7 +153,7 @@ async def query(request: QueryRequest) -> EventSourceResponse:
                         input_arguments=input_args,
                     )
                 )
-            
+
             # Retrieve the widget data for the selected widgets
             yield get_widget_data(widget_requests).model_dump()
 
@@ -161,17 +166,21 @@ async def query(request: QueryRequest) -> EventSourceResponse:
     async def process_request():
         # Check if this is a tool response (widget data)
         last_message = request.messages[-1] if request.messages else None
-        is_tool_response = (last_message and hasattr(last_message, 'role') 
-                           and last_message.role == "tool" 
-                           and hasattr(last_message, 'data') and last_message.data)
-        
+        is_tool_response = (
+            last_message
+            and hasattr(last_message, "role")
+            and last_message.role == "tool"
+            and hasattr(last_message, "data")
+            and last_message.data
+        )
+
         # If it's a tool response, analyze the data with LLM
         if is_tool_response:
             yield reasoning_step(
                 event_type="INFO",
-                message="Analyzing the widget data to provide comprehensive insights..."
+                message="Analyzing the widget data to provide comprehensive insights...",
             ).model_dump()
-            
+
             # Build context from all widget data
             context_str = "Use the following data to answer the question:\n\n"
             result_str = "--- Widget Data ---\n"
@@ -180,7 +189,7 @@ async def query(request: QueryRequest) -> EventSourceResponse:
                     result_str += f"{item.content}\n"
                     result_str += "------\n"
             context_str += result_str
-            
+
             # Build messages for LLM using dynamic system prompt with widget context
             widget_context = ""
             if last_message.data:
@@ -188,16 +197,16 @@ async def query(request: QueryRequest) -> EventSourceResponse:
                 for result in last_message.data:
                     for item in result.items:
                         # Extract widget name/source from content if available
-                        if hasattr(item, 'source') and item.source:
+                        if hasattr(item, "source") and item.source:
                             widget_names.append(item.source)
                 if widget_names:
                     widget_context = f"Data from {len(widget_names)} widget(s): {', '.join(set(widget_names))}"
                 else:
                     widget_context = f"Data from {len(last_message.data)} widget(s)"
-            
+
             system_prompt = get_system_prompt(perplexity_enabled, widget_context)
             messages = [{"role": "system", "content": system_prompt}]
-            
+
             # Add conversation history (skip the tool response)
             for msg in request.messages[:-1]:
                 if hasattr(msg, "role") and hasattr(msg, "content"):
@@ -205,23 +214,27 @@ async def query(request: QueryRequest) -> EventSourceResponse:
                         messages.append({"role": "user", "content": msg.content})
                     elif msg.role == "ai" and isinstance(msg.content, str):
                         messages.append({"role": "assistant", "content": msg.content})
-            
+
             # Add the widget data context to the last user message
             if messages and messages[-1]["role"] == "user":
                 messages[-1]["content"] += "\n\n" + context_str
             else:
                 # Fallback if no user message found
-                messages.append({
-                    "role": "user", 
-                    "content": f"Please analyze this data and provide insights:\n\n{context_str}"
-                })
-            
+                messages.append(
+                    {
+                        "role": "user",
+                        "content": f"Please analyze this data and provide insights:\n\n{context_str}",
+                    }
+                )
+
             # Call LLM for analysis
             api_key = os.environ.get("OPENROUTER_API_KEY")
             if not api_key:
-                yield message_chunk("Error: OPENROUTER_API_KEY not configured").model_dump()
+                yield message_chunk(
+                    "Error: OPENROUTER_API_KEY not configured"
+                ).model_dump()
                 return
-                
+
             url = "https://openrouter.ai/api/v1/chat/completions"
             headers = {
                 "Authorization": f"Bearer {api_key}",
@@ -230,11 +243,15 @@ async def query(request: QueryRequest) -> EventSourceResponse:
                 "X-Title": "OpenBB Terminal Pro",
                 "Accept": "application/json",
             }
-            
+
             # Model selection: env default, override with feature toggle for Perplexity
-            model_name = os.environ.get("OPENROUTER_MODEL", "deepseek/deepseek-chat-v3-0324")
+            model_name = os.environ.get(
+                "OPENROUTER_MODEL", "deepseek/deepseek-chat-v3-0324"
+            )
             if perplexity_enabled:
-                model_name = os.environ.get("OPENROUTER_MODEL_PERPLEXITY", "perplexity/sonar")
+                model_name = os.environ.get(
+                    "OPENROUTER_MODEL_PERPLEXITY", "perplexity/sonar"
+                )
             # Prefer streaming; some models (e.g., certain Perplexity routes) may not support it reliably.
             try:
                 async with httpx.AsyncClient(timeout=60.0) as client:
@@ -245,7 +262,9 @@ async def query(request: QueryRequest) -> EventSourceResponse:
                         "stream": stream_flag,
                     }
                     if stream_flag:
-                        async with client.stream("POST", url, headers=headers, json=data) as response:
+                        async with client.stream(
+                            "POST", url, headers=headers, json=data
+                        ) as response:
                             response.raise_for_status()
                             async for line in response.aiter_lines():
                                 if not line or not line.startswith("data: "):
@@ -255,7 +274,11 @@ async def query(request: QueryRequest) -> EventSourceResponse:
                                     break
                                 try:
                                     chunk = json.loads(line)
-                                    content = chunk.get("choices", [{}])[0].get("delta", {}).get("content")
+                                    content = (
+                                        chunk.get("choices", [{}])[0]
+                                        .get("delta", {})
+                                        .get("content")
+                                    )
                                     if content:
                                         yield message_chunk(content).model_dump()
                                 except json.JSONDecodeError:
@@ -273,8 +296,14 @@ async def query(request: QueryRequest) -> EventSourceResponse:
                             yield message_chunk(content).model_dump()
             except Exception:
                 # Fallback to non-stream default model if Perplexity or streaming fails
-                fallback_model = os.environ.get("OPENROUTER_MODEL", "deepseek/deepseek-chat-v3-0324")
-                payload = {"model": fallback_model, "messages": messages, "stream": False}
+                fallback_model = os.environ.get(
+                    "OPENROUTER_MODEL", "deepseek/deepseek-chat-v3-0324"
+                )
+                payload = {
+                    "model": fallback_model,
+                    "messages": messages,
+                    "stream": False,
+                }
                 try:
                     async with httpx.AsyncClient(timeout=60.0) as client:
                         resp = await client.post(url, headers=headers, json=payload)
@@ -288,14 +317,18 @@ async def query(request: QueryRequest) -> EventSourceResponse:
                         if content:
                             yield message_chunk(content).model_dump()
                 except Exception:
-                    yield message_chunk("Error generating commentary. Please try again or switch models.").model_dump()
+                    yield message_chunk(
+                        "Error generating commentary. Please try again or switch models."
+                    ).model_dump()
             return
 
         # For any remaining human messages (no Primary fetch and no tool data), defer to the model
         if last_message and last_message.role == "human":
             api_key = os.environ.get("OPENROUTER_API_KEY")
             if not api_key:
-                yield message_chunk("Error: OPENROUTER_API_KEY not configured").model_dump()
+                yield message_chunk(
+                    "Error: OPENROUTER_API_KEY not configured"
+                ).model_dump()
                 return
 
             url = "https://openrouter.ai/api/v1/chat/completions"
@@ -308,25 +341,39 @@ async def query(request: QueryRequest) -> EventSourceResponse:
             }
 
             # Build conversation history (system + user/assistant messages only)
-            system_prompt = get_system_prompt(perplexity_enabled, "")  # No widgets in this path
+            system_prompt = get_system_prompt(
+                perplexity_enabled, ""
+            )  # No widgets in this path
             messages = [{"role": "system", "content": system_prompt}]
             for msg in request.messages:
                 if getattr(msg, "role", None) == "human":
                     messages.append({"role": "user", "content": msg.content})
-                elif getattr(msg, "role", None) == "ai" and isinstance(msg.content, str):
+                elif getattr(msg, "role", None) == "ai" and isinstance(
+                    msg.content, str
+                ):
                     messages.append({"role": "assistant", "content": msg.content})
 
             # Model selection with Perplexity toggle
-            model_name = os.environ.get("OPENROUTER_MODEL", "deepseek/deepseek-chat-v3-0324")
+            model_name = os.environ.get(
+                "OPENROUTER_MODEL", "deepseek/deepseek-chat-v3-0324"
+            )
             if perplexity_enabled:
-                model_name = os.environ.get("OPENROUTER_MODEL_PERPLEXITY", "perplexity/sonar")
+                model_name = os.environ.get(
+                    "OPENROUTER_MODEL_PERPLEXITY", "perplexity/sonar"
+                )
 
             try:
                 async with httpx.AsyncClient(timeout=60.0) as client:
                     stream_flag = not perplexity_enabled
-                    payload = {"model": model_name, "messages": messages, "stream": stream_flag}
+                    payload = {
+                        "model": model_name,
+                        "messages": messages,
+                        "stream": stream_flag,
+                    }
                     if stream_flag:
-                        async with client.stream("POST", url, headers=headers, json=payload) as response:
+                        async with client.stream(
+                            "POST", url, headers=headers, json=payload
+                        ) as response:
                             response.raise_for_status()
                             async for line in response.aiter_lines():
                                 if not line or not line.startswith("data: "):
@@ -336,7 +383,11 @@ async def query(request: QueryRequest) -> EventSourceResponse:
                                     break
                                 try:
                                     chunk = json.loads(line)
-                                    content = chunk.get("choices", [{}])[0].get("delta", {}).get("content")
+                                    content = (
+                                        chunk.get("choices", [{}])[0]
+                                        .get("delta", {})
+                                        .get("content")
+                                    )
                                     if content:
                                         yield message_chunk(content).model_dump()
                                 except json.JSONDecodeError:
@@ -345,27 +396,45 @@ async def query(request: QueryRequest) -> EventSourceResponse:
                         resp = await client.post(url, headers=headers, json=payload)
                         resp.raise_for_status()
                         body = resp.json()
-                        content = body.get("choices", [{}])[0].get("message", {}).get("content", "")
+                        content = (
+                            body.get("choices", [{}])[0]
+                            .get("message", {})
+                            .get("content", "")
+                        )
                         if content:
                             yield message_chunk(content).model_dump()
             except Exception:
                 # Fallback to non‑stream default model
-                fallback_model = os.environ.get("OPENROUTER_MODEL", "deepseek/deepseek-chat-v3-0324")
+                fallback_model = os.environ.get(
+                    "OPENROUTER_MODEL", "deepseek/deepseek-chat-v3-0324"
+                )
                 try:
                     async with httpx.AsyncClient(timeout=60.0) as client:
-                        payload = {"model": fallback_model, "messages": messages, "stream": False}
+                        payload = {
+                            "model": fallback_model,
+                            "messages": messages,
+                            "stream": False,
+                        }
                         resp = await client.post(url, headers=headers, json=payload)
                         resp.raise_for_status()
                         body = resp.json()
-                        content = body.get("choices", [{}])[0].get("message", {}).get("content", "")
+                        content = (
+                            body.get("choices", [{}])[0]
+                            .get("message", {})
+                            .get("content", "")
+                        )
                         if content:
                             yield message_chunk(content).model_dump()
                 except Exception:
-                    yield message_chunk("Sorry, I couldn’t generate a response. Please try again.").model_dump()
+                    yield message_chunk(
+                        "Sorry, I couldn’t generate a response. Please try again."
+                    ).model_dump()
             return
-        
+
         # Default response (should rarely be hit)
-        yield message_chunk("How can I help with your portfolio commentary?").model_dump()
+        yield message_chunk(
+            "How can I help with your portfolio commentary?"
+        ).model_dump()
 
     return EventSourceResponse(
         content=process_request(),

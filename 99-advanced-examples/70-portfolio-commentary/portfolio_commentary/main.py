@@ -11,9 +11,51 @@ from openbb_ai.models import QueryRequest
 from sse_starlette.sse import EventSourceResponse
 from dotenv import load_dotenv
 
-from .prompts import SYSTEM_PROMPT
 
 load_dotenv(".env")
+
+
+def get_system_prompt(perplexity_enabled: bool = False, widget_context: str = "") -> str:
+    """Generate a dynamic system prompt based on available features and context."""
+    base_prompt = """You are an AI assistant specializing in portfolio analysis and financial commentary. Your role is to provide clear, actionable insights based on the data provided to you.
+
+Core Principles:
+- Be data-driven: Only use information explicitly provided in the context. Never invent or speculate on data.
+- Be structured: Organize insights into logical sections (Overview, Performance, Allocation, Risk, Key Insights).
+- Be concise: Use bullet points and short paragraphs. Aim for clarity over length (~250 words unless detailed analysis is requested).
+- Be transparent: If critical data is missing, acknowledge gaps and suggest what additional information would be helpful.
+
+Analysis Framework:
+- Performance: Focus on returns across relevant time periods (WTD/MTD/YTD), compare against benchmarks when available.
+- Allocation: Analyze asset distribution, sector exposure, geographic allocation as relevant.
+- Risk: Comment on volatility, drawdowns, correlations when data is available.
+- Attribution: Identify top contributors and detractors to performance.
+- Context: Incorporate market conditions and external factors that may impact the portfolio."""
+
+    # Add perplexity-specific guidance
+    if perplexity_enabled:
+        base_prompt += """
+
+Enhanced Capabilities:
+- You have access to real-time web search through Perplexity. Use this to provide current market context, recent news affecting holdings, industry trends, or macroeconomic factors that relate to the portfolio.
+- When analyzing performance or holdings, consider incorporating relevant current events or market developments."""
+
+    # Add widget-specific context
+    if widget_context:
+        base_prompt += f"""
+
+Available Data Context:
+{widget_context}
+
+Focus your analysis on the specific data available from these sources."""
+    else:
+        base_prompt += """
+
+Data Requirements:
+- No portfolio data is currently available. Request specific widgets (performance, holdings, allocation, etc.) to be added to the dashboard before proceeding with analysis."""
+
+    return base_prompt
+
 
 app = FastAPI()
 
@@ -26,8 +68,6 @@ app.add_middleware(
 )
 
 
-
-
 @app.get("/agents.json")
 def get_copilot_description():
     """Copilot descriptor for OpenBB Workspace."""
@@ -35,7 +75,7 @@ def get_copilot_description():
         content={
             "portfolio_commentary": {
                 "name": "Portfolio Commentary",
-                "description": "Analyzes your portfolio widgets to produce a concise, structured portfolio commentary.",
+                "description": "Analyzes your portfolio widgets to produce a concise, structured portfolio commentary. Defaults to DeepSeek unless Perplexity Search feature is enabled.",
                 "image": "https://github.com/OpenBB-finance/copilot-for-terminal-pro/assets/14093308/7da2a512-93b9-478d-90bc-b8c3dd0cabcf",
                 "endpoints": {"query": "/v1/query"},
                 "features": {
@@ -51,8 +91,6 @@ def get_copilot_description():
             }
         }
     )
-
-
 
 
 @app.post("/v1/query")
@@ -143,8 +181,22 @@ async def query(request: QueryRequest) -> EventSourceResponse:
                     result_str += "------\n"
             context_str += result_str
             
-            # Build messages for LLM using the prompts.py system prompt
-            messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+            # Build messages for LLM using dynamic system prompt with widget context
+            widget_context = ""
+            if last_message.data:
+                widget_names = []
+                for result in last_message.data:
+                    for item in result.items:
+                        # Extract widget name/source from content if available
+                        if hasattr(item, 'source') and item.source:
+                            widget_names.append(item.source)
+                if widget_names:
+                    widget_context = f"Data from {len(widget_names)} widget(s): {', '.join(set(widget_names))}"
+                else:
+                    widget_context = f"Data from {len(last_message.data)} widget(s)"
+            
+            system_prompt = get_system_prompt(perplexity_enabled, widget_context)
+            messages = [{"role": "system", "content": system_prompt}]
             
             # Add conversation history (skip the tool response)
             for msg in request.messages[:-1]:
@@ -256,7 +308,8 @@ async def query(request: QueryRequest) -> EventSourceResponse:
             }
 
             # Build conversation history (system + user/assistant messages only)
-            messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+            system_prompt = get_system_prompt(perplexity_enabled, "")  # No widgets in this path
+            messages = [{"role": "system", "content": system_prompt}]
             for msg in request.messages:
                 if getattr(msg, "role", None) == "human":
                     messages.append({"role": "user", "content": msg.content})

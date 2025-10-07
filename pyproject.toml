@@ -7,7 +7,7 @@ readme = "README.md"
 package-mode = false
 [tool.poetry.dependencies]
 python = "^3.10"
-fastapi = "^0.115.0"
+fastapi = "^0.118.0"
 uvicorn = "^0.27.0.post1"
 python-dotenv = "^1.0.1"
 sse-starlette = "^2.1.2"

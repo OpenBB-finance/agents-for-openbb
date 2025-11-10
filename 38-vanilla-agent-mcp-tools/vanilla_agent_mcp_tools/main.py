@@ -242,7 +242,7 @@ async def query(request: QueryRequest) -> EventSourceResponse:
         if last_message and last_message.role == "tool":
             # We have tool results, continue the conversation with the LLM
             # The tool results are already added to context_str above
-            print(f"[DEBUG] Continuing conversation with tool results - NO FUNCTIONS")
+            print("[DEBUG] Continuing conversation with tool results - NO FUNCTIONS")
 
             # Use streaming for the final response WITHOUT function calling
             async for event in await client.chat.completions.create(

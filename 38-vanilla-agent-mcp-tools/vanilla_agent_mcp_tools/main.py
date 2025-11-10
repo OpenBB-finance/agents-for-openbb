@@ -12,7 +12,12 @@ from openai.types.chat import (
     ChatCompletionUserMessageParam,
 )
 from openbb_ai import WidgetRequest, get_widget_data, message_chunk
-from openbb_ai.models import MessageChunkSSE, QueryRequest, FunctionCallSSE, FunctionCallSSEData
+from openbb_ai.models import (
+    MessageChunkSSE,
+    QueryRequest,
+    FunctionCallSSE,
+    FunctionCallSSEData,
+)
 from sse_starlette.sse import EventSourceResponse
 
 app = FastAPI()
@@ -50,12 +55,12 @@ def get_copilot_description():
 @app.post("/v1/query")
 async def query(request: QueryRequest) -> EventSourceResponse:
     """Query the Copilot with MCP tools support."""
-    
+
     # Debug: Print all messages to understand the flow
     print(f"[DEBUG] Received request with {len(request.messages)} messages:")
     for i, msg in enumerate(request.messages):
         content_preview = "NO CONTENT"
-        if hasattr(msg, 'content') and msg.content:
+        if hasattr(msg, "content") and msg.content:
             try:
                 if isinstance(msg.content, str):
                     content_preview = msg.content[:100]
@@ -64,15 +69,15 @@ async def query(request: QueryRequest) -> EventSourceResponse:
             except Exception as e:
                 content_preview = f"ERROR_READING_CONTENT: {e}"
         print(f"[DEBUG] Message {i}: role='{msg.role}', content='{content_preview}...'")
-        if hasattr(msg, 'function') and msg.function:
+        if hasattr(msg, "function") and msg.function:
             print(f"[DEBUG] Message {i} has function: {msg.function}")
-        if hasattr(msg, 'data') and msg.data:
+        if hasattr(msg, "data") and msg.data:
             print(f"[DEBUG] Message {i} has data: {len(msg.data)} items")
             for j, data_item in enumerate(msg.data):
-                if hasattr(data_item, 'items') and data_item.items:
+                if hasattr(data_item, "items") and data_item.items:
                     print(f"[DEBUG] Data {j}: {len(data_item.items)} items")
                     for k, item in enumerate(data_item.items):
-                        item_content = getattr(item, 'content', 'NO ITEM CONTENT')
+                        item_content = getattr(item, "content", "NO ITEM CONTENT")
                         print(f"[DEBUG] Item {k}: {item_content[:200]}...")
                 else:
                     print(f"[DEBUG] Data {j}: {data_item}")
@@ -113,24 +118,29 @@ async def query(request: QueryRequest) -> EventSourceResponse:
         )
 
     # Format the messages into a list of OpenAI messages
-    system_content = "You are a helpful financial assistant. Your name is 'Vanilla Agent'."
+    system_content = (
+        "You are a helpful financial assistant. Your name is 'Vanilla Agent'."
+    )
 
     # Add MCP tools to system prompt if available
     if request.tools:
         print(f"[DEBUG] Available MCP tools: {len(request.tools)} tools found")
         system_content += "\n\nYou have access to the following MCP tools:\n"
         for tool in request.tools:
-            server_id = getattr(tool, 'server_id', 'unknown')
+            server_id = getattr(tool, "server_id", "unknown")
             print(f"[DEBUG] Tool: {tool.name}, Server ID: {server_id}")
             print(f"[DEBUG] Tool URL: {getattr(tool, 'url', 'NO_URL')}")
             print(f"[DEBUG] Tool endpoint: {getattr(tool, 'endpoint', 'NO_ENDPOINT')}")
             print(f"[DEBUG] Tool input_schema: {tool.input_schema}")
             system_content += f"- Tool: {tool.name} (Server ID: {server_id})\n"
             system_content += f"  Description: {tool.description}\n"
-            if hasattr(tool, 'input_schema') and tool.input_schema:
+            if hasattr(tool, "input_schema") and tool.input_schema:
                 system_content += f"  Parameters: {tool.input_schema}\n"
                 # Add parameter details to help LLM understand what to pass
-                if isinstance(tool.input_schema, dict) and 'properties' in tool.input_schema:
+                if (
+                    isinstance(tool.input_schema, dict)
+                    and "properties" in tool.input_schema
+                ):
                     system_content += f"  Required parameters: {tool.input_schema.get('properties', {}).keys()}\n"
         system_content += "\nUse the execute_agent_tool function to call these tools. When calling, make sure to:\n"
         system_content += "1. Use the exact Server ID and tool name as shown above\n"
@@ -148,31 +158,40 @@ async def query(request: QueryRequest) -> EventSourceResponse:
     functions = []
     if request.tools:
         # Create a single execute_agent_tool function that can call any MCP tool
-        functions.append({
-            "name": "execute_agent_tool",
-            "description": "Execute an MCP tool to retrieve data",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "server_id": {
-                        "type": "string",
-                        "description": "The ID of the MCP server",
-                        "enum": list(set(getattr(tool, 'server_id', 'unknown') for tool in request.tools))
+        functions.append(
+            {
+                "name": "execute_agent_tool",
+                "description": "Execute an MCP tool to retrieve data",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "server_id": {
+                            "type": "string",
+                            "description": "The ID of the MCP server",
+                            "enum": list(
+                                set(
+                                    getattr(tool, "server_id", "unknown")
+                                    for tool in request.tools
+                                )
+                            ),
+                        },
+                        "tool_name": {
+                            "type": "string",
+                            "description": "The name of the tool to execute",
+                            "enum": [
+                                tool.name for tool in request.tools
+                            ],  # Use full tool names
+                        },
+                        "parameters": {
+                            "type": "object",
+                            "description": "The arguments to pass to the tool. Use the parameter schema defined for each specific tool.",
+                            "additionalProperties": True,
+                        },
                     },
-                    "tool_name": {
-                        "type": "string", 
-                        "description": "The name of the tool to execute",
-                        "enum": [tool.name for tool in request.tools]  # Use full tool names
-                    },
-                    "parameters": {
-                        "type": "object",
-                        "description": "The arguments to pass to the tool. Use the parameter schema defined for each specific tool.",
-                        "additionalProperties": True
-                    }
+                    "required": ["server_id", "tool_name", "parameters"],
                 },
-                "required": ["server_id", "tool_name", "parameters"]
             }
-        })
+        )
 
     context_str = ""
     for index, message in enumerate(request.messages):
@@ -192,7 +211,9 @@ async def query(request: QueryRequest) -> EventSourceResponse:
         # previously-retrieved widget data from piling up and exceeding the
         # context limit of the LLM.
         elif message.role == "tool" and index == len(request.messages) - 1:
-            context_str += "IMPORTANT: You MUST structure your response exactly as follows:\n\n"
+            context_str += (
+                "IMPORTANT: You MUST structure your response exactly as follows:\n\n"
+            )
             context_str += "## MCP OUTPUT\n"
             for result in message.data:
                 for item in result.items:
@@ -202,23 +223,27 @@ async def query(request: QueryRequest) -> EventSourceResponse:
 
     if context_str:
         openai_messages[-1]["content"] += "\n\n" + context_str  # type: ignore
-    
+
     # Debug: Print the final OpenAI messages
     print(f"[DEBUG] Sending {len(openai_messages)} messages to OpenAI:")
     for i, msg in enumerate(openai_messages):
-        print(f"[DEBUG] OpenAI Message {i}: role='{msg['role']}', content_length={len(str(msg.get('content', '')))}")
+        print(
+            f"[DEBUG] OpenAI Message {i}: role='{msg['role']}', content_length={len(str(msg.get('content', '')))}"
+        )
 
     # Define the execution loop with MCP support
-    async def execution_loop() -> AsyncGenerator[MessageChunkSSE | FunctionCallSSE, None]:
+    async def execution_loop() -> (
+        AsyncGenerator[MessageChunkSSE | FunctionCallSSE, None]
+    ):
         client = openai.AsyncOpenAI()
-        
+
         # Check if the last message contains tool results (from MCP execution)
         last_message = request.messages[-1] if request.messages else None
         if last_message and last_message.role == "tool":
             # We have tool results, continue the conversation with the LLM
             # The tool results are already added to context_str above
             print(f"[DEBUG] Continuing conversation with tool results - NO FUNCTIONS")
-            
+
             # Use streaming for the final response WITHOUT function calling
             async for event in await client.chat.completions.create(
                 model="gpt-4o",
@@ -243,16 +268,21 @@ async def query(request: QueryRequest) -> EventSourceResponse:
             message = response.choices[0].message
 
             # Handle function calls
-            if message.function_call and message.function_call.name == "execute_agent_tool":
+            if (
+                message.function_call
+                and message.function_call.name == "execute_agent_tool"
+            ):
                 try:
                     # Parse function arguments
                     args = json.loads(message.function_call.arguments)
-                    
+
                     server_id = args.get("server_id", "")
                     tool_name = args.get("tool_name", "")
                     parameters = args.get("parameters", {})
-                    
-                    print(f"[DEBUG] Executing MCP tool: server_id='{server_id}', tool_name='{tool_name}'")
+
+                    print(
+                        f"[DEBUG] Executing MCP tool: server_id='{server_id}', tool_name='{tool_name}'"
+                    )
                     print(f"[DEBUG] Tool parameters: {parameters}")
                     print(f"[DEBUG] Sending to frontend with tool_name: '{tool_name}'")
 
@@ -271,7 +301,7 @@ async def query(request: QueryRequest) -> EventSourceResponse:
                                 "tool_args": parameters,
                                 "summary": f"Execute {tool_name} MCP tool",
                             }
-                        }
+                        },
                     )
 
                     yield FunctionCallSSE(data=function_call_data).model_dump()

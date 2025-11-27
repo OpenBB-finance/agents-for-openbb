@@ -59,11 +59,8 @@ async def query(request: QueryRequest) -> EventSourceResponse:
     # We only automatically fetch widget data if the last message is from a
     # human, and widgets have been explicitly added to the request.
     last_message = request.messages[-1]
-    orchestration_requested = (
-        last_message.role == "ai" and last_message.agent_id == "openbb-copilot"
-    )
     if (
-        (last_message.role == "human" or orchestration_requested)
+        last_message.role == "human"
         and request.widgets
         and request.widgets.primary
     ):
@@ -135,22 +132,23 @@ NEVER pass "parameters": {} when a tool has required parameters!
 Example correct usage:
 {
   "server_id": "example_server",
-  "tool_name": "available_tools",
-  "parameters": {"category": "all"}  ← REQUIRED! Not empty!
+  "tool_name": "some_tool",
+  "parameters": {"param1": "value1", "param2": "value2"}
 }
 
 MANDATORY RULES:
 1. Check each tool's required parameters above (marked as REQUIRED)
 2. ALWAYS provide values for ALL required parameters
-3. If you see 'category' is required, use: "parameters": {"category": "all"}
-4. If you see any REQUIRED parameter, you MUST include it with a sensible value
-5. After receiving tool results, answer the user's question - don't call tools again
+3. Read the tool's description and parameter descriptions carefully to determine valid values
+4. If a parameter has an enum or specific valid values mentioned, use only those values
+5. If you're unsure about valid values, check the tool description for hints or examples
+6. After receiving tool results, answer the user's question - don't call tools again
 
-DEFAULT VALUES TO USE when unsure:
-• category → "all"
-• limit → 10
-• offset → 0
-• enabled → true"""
+IMPORTANT: Each tool may have different valid values for its parameters. Always determine the correct values based on:
+- The tool's description
+- The parameter's description
+- Any enum values or constraints mentioned in the schema
+- Context from error messages if a call fails"""
 
     openai_messages: list[ChatCompletionMessageParam] = [
         ChatCompletionSystemMessageParam(

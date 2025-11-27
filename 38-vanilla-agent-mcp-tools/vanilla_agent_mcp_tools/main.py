@@ -56,7 +56,6 @@ def get_copilot_description():
 async def query(request: QueryRequest) -> EventSourceResponse:
     """Query the Copilot with MCP tools support."""
 
-
     # We only automatically fetch widget data if the last message is from a
     # human, and widgets have been explicitly added to the request.
     last_message = request.messages[-1]
@@ -109,7 +108,7 @@ async def query(request: QueryRequest) -> EventSourceResponse:
                 if isinstance(tool.input_schema, dict):
                     properties = tool.input_schema.get("properties", {})
                     required = tool.input_schema.get("required", [])
-                    
+
                     if properties:
                         system_content += "  Parameters:\n"
                         for param_name, param_info in properties.items():
@@ -117,13 +116,15 @@ async def query(request: QueryRequest) -> EventSourceResponse:
                             param_desc = param_info.get("description", "")
                             is_required = param_name in required
                             req_str = " (REQUIRED)" if is_required else " (optional)"
-                            system_content += f"    - {param_name}{req_str}: {param_type}"
+                            system_content += (
+                                f"    - {param_name}{req_str}: {param_type}"
+                            )
                             if param_desc:
                                 system_content += f" - {param_desc}"
                             system_content += "\n"
                 else:
                     system_content += f"  Parameters schema: {tool.input_schema}\n"
-        
+
         system_content += """
 
 CRITICAL MCP TOOL USAGE RULES - YOU MUST FOLLOW THESE:
@@ -200,7 +201,7 @@ DEFAULT VALUES TO USE when unsure:
     # Helper function to truncate content if too long
     def truncate_content(content: str, max_chars: int = 50000) -> str:
         """Truncate content to avoid hitting OpenAI's token limits.
-        
+
         Roughly 1 token ≈ 4 chars, so 50k chars ≈ 12.5k tokens per message.
         With multiple messages, this should stay well under the 128k limit.
         """

@@ -56,21 +56,6 @@ def get_copilot_description():
 async def query(request: QueryRequest) -> EventSourceResponse:
     """Query the Copilot with MCP tools support."""
 
-    for i, msg in enumerate(request.messages):
-        content_preview = "NO CONTENT"
-        if hasattr(msg, "content") and msg.content:
-            try:
-                if isinstance(msg.content, str):
-                    content_preview = msg.content[:100]
-                else:
-                    content_preview = str(msg.content)[:100]
-            except Exception as e:
-                content_preview = f"ERROR_READING_CONTENT: {e}"
-        if hasattr(msg, "data") and msg.data:
-            for j, data_item in enumerate(msg.data):
-                if hasattr(data_item, "items") and data_item.items:
-                    for k, item in enumerate(data_item.items):
-                        item_content = getattr(item, "content", "NO ITEM CONTENT")
 
     # We only automatically fetch widget data if the last message is from a
     # human, and widgets have been explicitly added to the request.

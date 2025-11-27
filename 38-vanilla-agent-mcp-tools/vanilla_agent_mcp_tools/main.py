@@ -178,17 +178,31 @@ async def query(request: QueryRequest) -> EventSourceResponse:
             }
         )
 
+    # Helper function to truncate content if too long
+    def truncate_content(content: str, max_chars: int = 1000000) -> str:
+        """Truncate content to avoid hitting OpenAI's token limits."""
+        if len(content) > max_chars:
+            # Keep first and last portions with ellipsis in middle
+            keep_start = max_chars // 2
+            keep_end = max_chars // 4
+            return f"{content[:keep_start]}\n\n... [Content truncated due to size limits] ...\n\n{content[-keep_end:]}"
+        return content
+
     context_str = ""
     for index, message in enumerate(request.messages):
         if message.role == "human":
+            # Truncate human messages if they're too long
+            content = truncate_content(message.content)
             openai_messages.append(
-                ChatCompletionUserMessageParam(role="user", content=message.content)
+                ChatCompletionUserMessageParam(role="user", content=content)
             )
         elif message.role == "ai":
             if isinstance(message.content, str):
+                # Truncate AI messages if they're too long
+                content = truncate_content(message.content)
                 openai_messages.append(
                     ChatCompletionAssistantMessageParam(
-                        role="assistant", content=message.content
+                        role="assistant", content=content
                     )
                 )
         # We only add the most recent tool call / widget data to context.  We do
@@ -200,13 +214,19 @@ async def query(request: QueryRequest) -> EventSourceResponse:
                 "IMPORTANT: You MUST structure your response exactly as follows:\n\n"
             )
             context_str += "## MCP OUTPUT\n"
+            tool_content = ""
             for result in message.data:
                 for item in result.items:
-                    context_str += f"{item.content}\n\n"
+                    tool_content += f"{item.content}\n\n"
+            # Truncate tool output if too long
+            tool_content = truncate_content(tool_content, max_chars=500000)
+            context_str += tool_content
             context_str += "## AI OUTPUT\n"
             context_str += "Now provide your analysis and answer to the user's question based on the MCP output above.\n\n"
 
     if context_str:
+        # Truncate the entire context before adding to prevent exceeding limits
+        context_str = truncate_content(context_str, max_chars=500000)
         openai_messages[-1]["content"] += "\n\n" + context_str  # type: ignore
 
     # Define the execution loop with MCP support
@@ -222,25 +242,34 @@ async def query(request: QueryRequest) -> EventSourceResponse:
             # The tool results are already added to context_str above
 
             # Use streaming for the final response WITHOUT function calling
-            async for event in await client.chat.completions.create(
-                model="gpt-4o",
-                messages=openai_messages,
-                stream=True,
-                # Don't pass functions here to prevent another tool call
-            ):
-                if chunk := event.choices[0].delta.content:
-                    yield message_chunk(chunk).model_dump()
+            try:
+                async for event in await client.chat.completions.create(
+                    model="gpt-4o",
+                    messages=openai_messages,
+                    stream=True,
+                    # Don't pass functions here to prevent another tool call
+                ):
+                    if chunk := event.choices[0].delta.content:
+                        yield message_chunk(chunk).model_dump()
+            except openai.BadRequestError as e:
+                error_msg = f"Error: Content too large for OpenAI API. {str(e)[:200]}"
+                yield message_chunk(error_msg).model_dump()
             return
 
         # Check if we need function calling
         if functions:
             # Use non-streaming for function calls
-            response = await client.chat.completions.create(
-                model="gpt-4o",
-                messages=openai_messages,
-                functions=functions,
-                stream=False,
-            )
+            try:
+                response = await client.chat.completions.create(
+                    model="gpt-4o",
+                    messages=openai_messages,
+                    functions=functions,
+                    stream=False,
+                )
+            except openai.BadRequestError as e:
+                error_msg = f"Error: Content too large for OpenAI API. {str(e)[:200]}"
+                yield message_chunk(error_msg).model_dump()
+                return
 
             message = response.choices[0].message
 
@@ -289,13 +318,17 @@ async def query(request: QueryRequest) -> EventSourceResponse:
                     yield message_chunk(char).model_dump()
         else:
             # Regular streaming without function calls
-            async for event in await client.chat.completions.create(
-                model="gpt-4o",
-                messages=openai_messages,
-                stream=True,
-            ):
-                if chunk := event.choices[0].delta.content:
-                    yield message_chunk(chunk).model_dump()
+            try:
+                async for event in await client.chat.completions.create(
+                    model="gpt-4o",
+                    messages=openai_messages,
+                    stream=True,
+                ):
+                    if chunk := event.choices[0].delta.content:
+                        yield message_chunk(chunk).model_dump()
+            except openai.BadRequestError as e:
+                error_msg = f"Error: Content too large for OpenAI API. {str(e)[:200]}"
+                yield message_chunk(error_msg).model_dump()
 
     # Stream the SSEs back to the client.
     return EventSourceResponse(

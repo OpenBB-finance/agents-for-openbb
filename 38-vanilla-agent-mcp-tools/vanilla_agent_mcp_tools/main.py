@@ -266,7 +266,7 @@ IMPORTANT: Each tool may have different valid values for its parameters. Always 
             # Use streaming for the final response WITHOUT function calling
             try:
                 async for event in await client.chat.completions.create(
-                    model="gpt-4o",
+                    model="gpt-4",
                     messages=openai_messages,
                     stream=True,
                     # Don't pass functions here to prevent another tool call
@@ -283,7 +283,7 @@ IMPORTANT: Each tool may have different valid values for its parameters. Always 
             # Use non-streaming for function calls
             try:
                 response = await client.chat.completions.create(
-                    model="gpt-4o",
+                    model="gpt-4.1",
                     messages=openai_messages,
                     functions=functions,
                     stream=False,
@@ -342,7 +342,7 @@ IMPORTANT: Each tool may have different valid values for its parameters. Always 
             # Regular streaming without function calls
             try:
                 async for event in await client.chat.completions.create(
-                    model="gpt-4o",
+                    model="gpt-4",
                     messages=openai_messages,
                     stream=True,
                 ):

@@ -124,26 +124,32 @@ async def query(request: QueryRequest) -> EventSourceResponse:
                 else:
                     system_content += f"  Parameters schema: {tool.input_schema}\n"
         
-        system_content += "\n\n⚠️ CRITICAL MCP TOOL USAGE RULES - YOU MUST FOLLOW THESE:\n\n"
-        system_content += "When calling execute_agent_tool, the 'parameters' field MUST contain the actual tool parameters.\n"
-        system_content += "NEVER pass \"parameters\": {} when a tool has required parameters!\n\n"
-        system_content += "Example correct usage:\n"
-        system_content += '{\n'
-        system_content += '  "server_id": "example_server",\n'
-        system_content += '  "tool_name": "available_tools",\n'
-        system_content += '  "parameters": {"category": "all"}  ← REQUIRED! Not empty!\n'
-        system_content += '}\n\n'
-        system_content += "MANDATORY RULES:\n"
-        system_content += "1. Check each tool's required parameters above (marked as REQUIRED)\n"
-        system_content += "2. ALWAYS provide values for ALL required parameters\n"
-        system_content += "3. If you see 'category' is required, use: \"parameters\": {\"category\": \"all\"}\n"
-        system_content += "4. If you see any REQUIRED parameter, you MUST include it with a sensible value\n"
-        system_content += "5. After receiving tool results, answer the user's question - don't call tools again\n\n"
-        system_content += "DEFAULT VALUES TO USE when unsure:\n"
-        system_content += "• category → \"all\"\n"
-        system_content += "• limit → 10\n"
-        system_content += "• offset → 0\n"
-        system_content += "• enabled → true"
+        system_content += """
+
+CRITICAL MCP TOOL USAGE RULES - YOU MUST FOLLOW THESE:
+
+When calling execute_agent_tool, the 'parameters' field MUST contain the actual tool parameters.
+NEVER pass "parameters": {} when a tool has required parameters!
+
+Example correct usage:
+{
+  "server_id": "example_server",
+  "tool_name": "available_tools",
+  "parameters": {"category": "all"}  ← REQUIRED! Not empty!
+}
+
+MANDATORY RULES:
+1. Check each tool's required parameters above (marked as REQUIRED)
+2. ALWAYS provide values for ALL required parameters
+3. If you see 'category' is required, use: "parameters": {"category": "all"}
+4. If you see any REQUIRED parameter, you MUST include it with a sensible value
+5. After receiving tool results, answer the user's question - don't call tools again
+
+DEFAULT VALUES TO USE when unsure:
+• category → "all"
+• limit → 10
+• offset → 0
+• enabled → true"""
 
     openai_messages: list[ChatCompletionMessageParam] = [
         ChatCompletionSystemMessageParam(

@@ -59,11 +59,7 @@ async def query(request: QueryRequest) -> EventSourceResponse:
     # We only automatically fetch widget data if the last message is from a
     # human, and widgets have been explicitly added to the request.
     last_message = request.messages[-1]
-    if (
-        last_message.role == "human"
-        and request.widgets
-        and request.widgets.primary
-    ):
+    if last_message.role == "human" and request.widgets and request.widgets.primary:
         widget_requests: list[WidgetRequest] = []
         # Note: If we wanted to iterate through the widgets on the dashboard
         # rather than on the widgets on the explicit context

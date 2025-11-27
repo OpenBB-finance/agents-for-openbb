@@ -102,20 +102,48 @@ async def query(request: QueryRequest) -> EventSourceResponse:
         system_content += "\n\nYou have access to the following MCP tools:\n"
         for tool in request.tools:
             server_id = getattr(tool, "server_id", "unknown")
-            system_content += f"- Tool: {tool.name} (Server ID: {server_id})\n"
+            system_content += f"\n- Tool: {tool.name} (Server ID: {server_id})\n"
             system_content += f"  Description: {tool.description}\n"
             if hasattr(tool, "input_schema") and tool.input_schema:
-                system_content += f"  Parameters: {tool.input_schema}\n"
-                # Add parameter details to help LLM understand what to pass
-                if (
-                    isinstance(tool.input_schema, dict)
-                    and "properties" in tool.input_schema
-                ):
-                    system_content += f"  Required parameters: {tool.input_schema.get('properties', {}).keys()}\n"
-        system_content += "\nUse the execute_agent_tool function to call these tools. When calling, make sure to:\n"
-        system_content += "1. Use the exact Server ID and tool name as shown above\n"
-        system_content += "2. Include all required parameters in the 'parameters' field based on the tool's schema\n"
-        system_content += "3. After receiving tool results, answer the user's question directly without calling tools again."
+                # Parse the schema to identify required parameters
+                if isinstance(tool.input_schema, dict):
+                    properties = tool.input_schema.get("properties", {})
+                    required = tool.input_schema.get("required", [])
+                    
+                    if properties:
+                        system_content += "  Parameters:\n"
+                        for param_name, param_info in properties.items():
+                            param_type = param_info.get("type", "unknown")
+                            param_desc = param_info.get("description", "")
+                            is_required = param_name in required
+                            req_str = " (REQUIRED)" if is_required else " (optional)"
+                            system_content += f"    - {param_name}{req_str}: {param_type}"
+                            if param_desc:
+                                system_content += f" - {param_desc}"
+                            system_content += "\n"
+                else:
+                    system_content += f"  Parameters schema: {tool.input_schema}\n"
+        
+        system_content += "\n\n⚠️ CRITICAL MCP TOOL USAGE RULES - YOU MUST FOLLOW THESE:\n\n"
+        system_content += "When calling execute_agent_tool, the 'parameters' field MUST contain the actual tool parameters.\n"
+        system_content += "NEVER pass \"parameters\": {} when a tool has required parameters!\n\n"
+        system_content += "Example correct usage:\n"
+        system_content += '{\n'
+        system_content += '  "server_id": "example_server",\n'
+        system_content += '  "tool_name": "available_tools",\n'
+        system_content += '  "parameters": {"category": "all"}  ← REQUIRED! Not empty!\n'
+        system_content += '}\n\n'
+        system_content += "MANDATORY RULES:\n"
+        system_content += "1. Check each tool's required parameters above (marked as REQUIRED)\n"
+        system_content += "2. ALWAYS provide values for ALL required parameters\n"
+        system_content += "3. If you see 'category' is required, use: \"parameters\": {\"category\": \"all\"}\n"
+        system_content += "4. If you see any REQUIRED parameter, you MUST include it with a sensible value\n"
+        system_content += "5. After receiving tool results, answer the user's question - don't call tools again\n\n"
+        system_content += "DEFAULT VALUES TO USE when unsure:\n"
+        system_content += "• category → \"all\"\n"
+        system_content += "• limit → 10\n"
+        system_content += "• offset → 0\n"
+        system_content += "• enabled → true"
 
     openai_messages: list[ChatCompletionMessageParam] = [
         ChatCompletionSystemMessageParam(
@@ -164,13 +192,17 @@ async def query(request: QueryRequest) -> EventSourceResponse:
         )
 
     # Helper function to truncate content if too long
-    def truncate_content(content: str, max_chars: int = 1000000) -> str:
-        """Truncate content to avoid hitting OpenAI's token limits."""
+    def truncate_content(content: str, max_chars: int = 50000) -> str:
+        """Truncate content to avoid hitting OpenAI's token limits.
+        
+        Roughly 1 token ≈ 4 chars, so 50k chars ≈ 12.5k tokens per message.
+        With multiple messages, this should stay well under the 128k limit.
+        """
         if len(content) > max_chars:
             # Keep first and last portions with ellipsis in middle
             keep_start = max_chars // 2
             keep_end = max_chars // 4
-            return f"{content[:keep_start]}\n\n... [Content truncated due to size limits] ...\n\n{content[-keep_end:]}"
+            return f"{content[:keep_start]}\n\n... [Content truncated due to size limits - showing first {keep_start} and last {keep_end} characters] ...\n\n{content[-keep_end:]}"
         return content
 
     context_str = ""
@@ -203,15 +235,15 @@ async def query(request: QueryRequest) -> EventSourceResponse:
             for result in message.data:
                 for item in result.items:
                     tool_content += f"{item.content}\n\n"
-            # Truncate tool output if too long
-            tool_content = truncate_content(tool_content, max_chars=500000)
+            # Truncate tool output if too long - be more aggressive with tool outputs
+            tool_content = truncate_content(tool_content, max_chars=30000)
             context_str += tool_content
             context_str += "## AI OUTPUT\n"
             context_str += "Now provide your analysis and answer to the user's question based on the MCP output above.\n\n"
 
     if context_str:
         # Truncate the entire context before adding to prevent exceeding limits
-        context_str = truncate_content(context_str, max_chars=500000)
+        context_str = truncate_content(context_str, max_chars=30000)
         openai_messages[-1]["content"] += "\n\n" + context_str  # type: ignore
 
     # Define the execution loop with MCP support

@@ -56,8 +56,6 @@ def get_copilot_description():
 async def query(request: QueryRequest) -> EventSourceResponse:
     """Query the Copilot with MCP tools support."""
 
-    # Debug: Print all messages to understand the flow
-    print(f"[DEBUG] Received request with {len(request.messages)} messages:")
     for i, msg in enumerate(request.messages):
         content_preview = "NO CONTENT"
         if hasattr(msg, "content") and msg.content:
@@ -68,19 +66,11 @@ async def query(request: QueryRequest) -> EventSourceResponse:
                     content_preview = str(msg.content)[:100]
             except Exception as e:
                 content_preview = f"ERROR_READING_CONTENT: {e}"
-        print(f"[DEBUG] Message {i}: role='{msg.role}', content='{content_preview}...'")
-        if hasattr(msg, "function") and msg.function:
-            print(f"[DEBUG] Message {i} has function: {msg.function}")
         if hasattr(msg, "data") and msg.data:
-            print(f"[DEBUG] Message {i} has data: {len(msg.data)} items")
             for j, data_item in enumerate(msg.data):
                 if hasattr(data_item, "items") and data_item.items:
-                    print(f"[DEBUG] Data {j}: {len(data_item.items)} items")
                     for k, item in enumerate(data_item.items):
                         item_content = getattr(item, "content", "NO ITEM CONTENT")
-                        print(f"[DEBUG] Item {k}: {item_content[:200]}...")
-                else:
-                    print(f"[DEBUG] Data {j}: {data_item}")
 
     # We only automatically fetch widget data if the last message is from a
     # human, and widgets have been explicitly added to the request.
@@ -124,14 +114,9 @@ async def query(request: QueryRequest) -> EventSourceResponse:
 
     # Add MCP tools to system prompt if available
     if request.tools:
-        print(f"[DEBUG] Available MCP tools: {len(request.tools)} tools found")
         system_content += "\n\nYou have access to the following MCP tools:\n"
         for tool in request.tools:
             server_id = getattr(tool, "server_id", "unknown")
-            print(f"[DEBUG] Tool: {tool.name}, Server ID: {server_id}")
-            print(f"[DEBUG] Tool URL: {getattr(tool, 'url', 'NO_URL')}")
-            print(f"[DEBUG] Tool endpoint: {getattr(tool, 'endpoint', 'NO_ENDPOINT')}")
-            print(f"[DEBUG] Tool input_schema: {tool.input_schema}")
             system_content += f"- Tool: {tool.name} (Server ID: {server_id})\n"
             system_content += f"  Description: {tool.description}\n"
             if hasattr(tool, "input_schema") and tool.input_schema:
@@ -224,13 +209,6 @@ async def query(request: QueryRequest) -> EventSourceResponse:
     if context_str:
         openai_messages[-1]["content"] += "\n\n" + context_str  # type: ignore
 
-    # Debug: Print the final OpenAI messages
-    print(f"[DEBUG] Sending {len(openai_messages)} messages to OpenAI:")
-    for i, msg in enumerate(openai_messages):
-        print(
-            f"[DEBUG] OpenAI Message {i}: role='{msg['role']}', content_length={len(str(msg.get('content', '')))}"
-        )
-
     # Define the execution loop with MCP support
     async def execution_loop() -> (
         AsyncGenerator[MessageChunkSSE | FunctionCallSSE, None]
@@ -242,7 +220,6 @@ async def query(request: QueryRequest) -> EventSourceResponse:
         if last_message and last_message.role == "tool":
             # We have tool results, continue the conversation with the LLM
             # The tool results are already added to context_str above
-            print("[DEBUG] Continuing conversation with tool results - NO FUNCTIONS")
 
             # Use streaming for the final response WITHOUT function calling
             async for event in await client.chat.completions.create(
@@ -279,12 +256,6 @@ async def query(request: QueryRequest) -> EventSourceResponse:
                     server_id = args.get("server_id", "")
                     tool_name = args.get("tool_name", "")
                     parameters = args.get("parameters", {})
-
-                    print(
-                        f"[DEBUG] Executing MCP tool: server_id='{server_id}', tool_name='{tool_name}'"
-                    )
-                    print(f"[DEBUG] Tool parameters: {parameters}")
-                    print(f"[DEBUG] Sending to frontend with tool_name: '{tool_name}'")
 
                     # Send function call back to frontend for MCP execution
                     function_call_data = FunctionCallSSEData(

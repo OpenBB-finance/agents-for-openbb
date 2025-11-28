@@ -71,6 +71,12 @@ If you prefer diving straight into code, we have a growing list of examples of c
 
 ---
 
+- [A vanilla agent that has access to MCP tools](./38-vanilla-agent-mcp-tools)
+
+<img width="600" alt="CleanShot 2025-11-26 at 22 26 05@2x" src="https://github.com/user-attachments/assets/5de0d79e-86da-4a81-a7eb-562843033824" />
+
+---
+
 - [A agent that shows how to access widgets from dashboard and context](./40-vanilla-agent-dashboard-widgets)
 
 <img width="600" height="2078" alt="image" src="https://github.com/user-attachments/assets/315212bf-355b-44d9-9d12-736ebcf2c7d0" />

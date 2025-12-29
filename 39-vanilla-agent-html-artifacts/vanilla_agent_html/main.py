@@ -53,13 +53,15 @@ def html_artifact(content: str, name: str, description: str) -> dict:
 
     return {
         "event": "copilotMessageArtifact",
-        "data": json.dumps({
-            "type": "html",
-            "uuid": str(uuid.uuid4()),
-            "name": name,
-            "description": description,
-            "content": content,
-        }),
+        "data": json.dumps(
+            {
+                "type": "html",
+                "uuid": str(uuid.uuid4()),
+                "name": name,
+                "description": description,
+                "content": content,
+            }
+        ),
     }
 
 

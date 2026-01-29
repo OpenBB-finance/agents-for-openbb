@@ -248,9 +248,9 @@ IMPORTANT: Each tool may have different valid values for its parameters. Always 
         openai_messages[-1]["content"] += "\n\n" + context_str  # type: ignore
 
     # Define the execution loop with MCP support
-    async def execution_loop() -> (
-        AsyncGenerator[MessageChunkSSE | FunctionCallSSE, None]
-    ):
+    async def execution_loop() -> AsyncGenerator[
+        MessageChunkSSE | FunctionCallSSE, None
+    ]:
         client = openai.AsyncOpenAI()
 
         # Check if the last message contains tool results (from MCP execution)

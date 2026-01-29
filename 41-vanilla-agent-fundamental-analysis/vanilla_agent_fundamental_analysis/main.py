@@ -19,6 +19,7 @@ from sse_starlette.sse import EventSourceResponse
 
 # --- 1. Tool Definitions ---
 
+
 def get_financial_metrics(symbol: str):
     """
     Fetches key financial metrics (Market Cap, PE Ratio, ROE) for a stock.
@@ -28,11 +29,12 @@ def get_financial_metrics(symbol: str):
         # Note: Using 'yfinance' as a free provider for this example.
         # In production, users might use 'fmp' or 'intrinio'.
         data = obb.equity.fundamental.metrics(symbol=symbol, provider="yfinance")
-        
+
         # Convert to a clean JSON string for the LLM
         return data.to_json(orient="records")
     except Exception as e:
         return f"Error fetching data for {symbol}: {str(e)}"
+
 
 # Schema to tell OpenAI about our tool
 TOOLS_SCHEMA = [
@@ -56,9 +58,7 @@ TOOLS_SCHEMA = [
 ]
 
 # Map tool names to the actual Python functions
-AVAILABLE_TOOLS = {
-    "get_financial_metrics": get_financial_metrics
-}
+AVAILABLE_TOOLS = {"get_financial_metrics": get_financial_metrics}
 
 # --- 2. App Setup ---
 
@@ -71,6 +71,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 @app.get("/agents.json")
 def get_copilot_description():
@@ -92,10 +93,11 @@ def get_copilot_description():
         },
     )
 
+
 @app.post("/v1/query")
 async def query(request: QueryRequest) -> EventSourceResponse:
     """The main agent loop handling tool calls and reasoning."""
-    
+
     # Initialize conversation with system prompt
     openai_messages: list[ChatCompletionMessageParam] = [
         ChatCompletionSystemMessageParam(
@@ -112,50 +114,54 @@ async def query(request: QueryRequest) -> EventSourceResponse:
     # Append user history
     for message in request.messages:
         if message.role == "human":
-            openai_messages.append(ChatCompletionUserMessageParam(role="user", content=message.content))
+            openai_messages.append(
+                ChatCompletionUserMessageParam(role="user", content=message.content)
+            )
         elif message.role == "ai":
-            openai_messages.append(ChatCompletionAssistantMessageParam(role="assistant", content=str(message.content)))
+            openai_messages.append(
+                ChatCompletionAssistantMessageParam(
+                    role="assistant", content=str(message.content)
+                )
+            )
 
     async def execution_loop() -> AsyncGenerator[MessageChunkSSE, None]:
         client = openai.AsyncOpenAI()
-        
+
         # --- Step 1: Let LLM decide if it needs tools ---
         response = await client.chat.completions.create(
             model="gpt-4o",
             messages=openai_messages,
             tools=TOOLS_SCHEMA,
             tool_choice="auto",
-            stream=False, # Wait for full response to check for tools
+            stream=False,  # Wait for full response to check for tools
         )
-        
+
         message = response.choices[0].message
 
         # --- Step 2: Did the agent ask for a tool? ---
         if message.tool_calls:
-            openai_messages.append(message) # Add intent to history
+            openai_messages.append(message)  # Add intent to history
 
             for tool_call in message.tool_calls:
                 fn_name = tool_call.function.name
                 fn_args = json.loads(tool_call.function.arguments)
-                
+
                 # *** THE FLEX: Yield a REAL reasoning step to the UI ***
                 # This shows up as a "Thinking..." spinner in OpenBB Workspace
                 yield reasoning_step(
                     event_type="INFO",
                     message=f"Fetching fundamental data for {fn_args.get('symbol')}...",
-                    details={"tool": fn_name, "args": fn_args}
+                    details={"tool": fn_name, "args": fn_args},
                 ).model_dump()
 
                 # Execute the tool
                 if fn_name in AVAILABLE_TOOLS:
                     result = AVAILABLE_TOOLS[fn_name](**fn_args)
-                    
+
                     # Feed result back to LLM
                     openai_messages.append(
                         ChatCompletionToolMessageParam(
-                            role="tool",
-                            tool_call_id=tool_call.id,
-                            content=str(result)
+                            role="tool", tool_call_id=tool_call.id, content=str(result)
                         )
                     )
 

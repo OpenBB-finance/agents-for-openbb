@@ -43,41 +43,14 @@ class SkillPayload(BaseModel):
     source: Literal["forced_slash", "model_selected"] = "model_selected"
 
 
-class HumanMessage(BaseModel):
-    role: Literal["human"]
-    content: str
-
-
-class AiMessage(BaseModel):
-    role: Literal["ai"]
-    content: Any
-
-
-class ToolResultPayload(BaseModel):
-    status: Literal["success", "error", "warning"]
-    message: str | None = None
-    data: dict[str, Any] | None = None
-
-
-class ToolMessage(BaseModel):
-    role: Literal["tool"]
-    function: str
-    input_arguments: dict[str, Any] = Field(default_factory=dict)
-    data: list[ToolResultPayload]
-    extra_state: dict[str, Any] = Field(default_factory=dict)
-
-
-ConversationMessage = HumanMessage | AiMessage | ToolMessage
-
-
 class DynamicSkillQueryRequest(BaseModel):
-    messages: list[ConversationMessage]
+    messages: list[dict[str, Any]]
     skills_catalog: list[SkillCatalogEntry] | None = None
     selected_skills: list[SkillPayload] | None = None
 
     @field_validator("messages")
     @classmethod
-    def validate_messages(cls, messages: list[ConversationMessage]):
+    def validate_messages(cls, messages: list[dict[str, Any]]):
         if not messages:
             raise ValueError("messages list cannot be empty")
         return messages
@@ -109,17 +82,6 @@ def _build_skill_function(skills_catalog: list[SkillCatalogEntry]) -> dict[str, 
     }
 
 
-def _read_result_field(result: Any, field_name: str) -> Any:
-    if isinstance(result, dict):
-        return result.get(field_name)
-    if hasattr(result, field_name):
-        return getattr(result, field_name)
-    model_extra = getattr(result, "model_extra", None)
-    if isinstance(model_extra, dict):
-        return model_extra.get(field_name)
-    return None
-
-
 def _extract_skill_from_tool_result(
     request: DynamicSkillQueryRequest,
 ) -> tuple[SkillPayload | None, str | None, bool]:
@@ -130,20 +92,19 @@ def _extract_skill_from_tool_result(
         return None, None, False
 
     last_message = request.messages[-1]
-    if last_message.role != "tool":
+    if last_message.get("role") != "tool":
         return None, None, False
 
-    function_name = getattr(last_message, "function", "")
-    if function_name != "get_skill_content":
+    if last_message.get("function") != "get_skill_content":
         return None, None, False
 
-    input_arguments = getattr(last_message, "input_arguments", {}) or {}
+    input_arguments = last_message.get("input_arguments") or {}
     slug = input_arguments.get("slug", "unknown-skill")
 
-    for result in getattr(last_message, "data", []):
-        status = _read_result_field(result, "status")
+    for result in last_message.get("data", []):
+        status = result.get("status")
         if status == "success":
-            payload = _read_result_field(result, "data")
+            payload = result.get("data")
             if not isinstance(payload, dict):
                 continue
 
@@ -167,7 +128,7 @@ def _extract_skill_from_tool_result(
                 )
 
         if status == "error":
-            error_message = _read_result_field(result, "message")
+            error_message = result.get("message")
             note = f"Skill '{slug}' could not be loaded."
             if error_message:
                 note += f" Reason: {error_message}"
@@ -257,14 +218,18 @@ def _build_openai_messages(
     ]
 
     for message in request.messages:
-        if message.role == "human":
+        if message.get("role") == "human":
             openai_messages.append(
-                ChatCompletionUserMessageParam(role="user", content=message.content)
+                ChatCompletionUserMessageParam(
+                    role="user", content=message["content"]
+                )
             )
-        elif message.role == "ai" and isinstance(message.content, str):
+        elif message.get("role") == "ai" and isinstance(
+            message.get("content"), str
+        ):
             openai_messages.append(
                 ChatCompletionAssistantMessageParam(
-                    role="assistant", content=message.content
+                    role="assistant", content=message["content"]
                 )
             )
 

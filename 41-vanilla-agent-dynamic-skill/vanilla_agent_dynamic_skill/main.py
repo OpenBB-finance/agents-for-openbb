@@ -15,6 +15,7 @@ from openai.types.chat import (
     ChatCompletionUserMessageParam,
 )
 from openbb_ai import message_chunk
+from openbb_ai.models import FunctionCallSSE, FunctionCallSSEData
 from pydantic import BaseModel, Field, ValidationError, field_validator
 from sse_starlette.sse import EventSourceResponse
 
@@ -270,23 +271,6 @@ def _build_openai_messages(
     return openai_messages
 
 
-def _function_call_event(
-    function_name: str,
-    input_arguments: dict[str, Any],
-    extra_state: dict[str, Any] | None = None,
-) -> dict[str, Any]:
-    data = {
-        "function": function_name,
-        "input_arguments": input_arguments,
-    }
-    if extra_state is not None:
-        data["extra_state"] = extra_state
-    return {
-        "event": "copilotFunctionCall",
-        "data": data,
-    }
-
-
 @app.get("/agents.json")
 def get_copilot_description():
     """Agent descriptor for OpenBB Workspace discovery."""
@@ -387,13 +371,15 @@ async def query(request: DynamicSkillQueryRequest) -> EventSourceResponse:
                 if reason:
                     input_arguments["reason"] = reason
 
-                yield _function_call_event(
-                    function_name="get_skill_content",
-                    input_arguments=input_arguments,
-                    extra_state={
-                        "copilot_function_call_arguments": input_arguments,
-                    },
-                )
+                yield FunctionCallSSE(
+                    data=FunctionCallSSEData(
+                        function="get_skill_content",
+                        input_arguments=input_arguments,
+                        extra_state={
+                            "copilot_function_call_arguments": input_arguments,
+                        },
+                    )
+                ).model_dump(exclude_none=True)
                 return
 
             content = getattr(message, "content", None)

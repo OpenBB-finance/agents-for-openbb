@@ -63,12 +63,14 @@ def _get_active_skill(request: SkillQueryRequest) -> SkillPayload | None:
         payload = getattr(result, "data", None)
         if isinstance(payload, dict) and isinstance(payload.get("skill"), dict):
             skill = payload["skill"]
-            return SkillPayload.model_validate({
-                "slug": skill.get("slug", ""),
-                "description": skill.get("description", ""),
-                "contentMarkdown": skill.get("contentMarkdown", ""),
-                "source": skill.get("source", "model_selected"),
-            })
+            return SkillPayload.model_validate(
+                {
+                    "slug": skill.get("slug", ""),
+                    "description": skill.get("description", ""),
+                    "contentMarkdown": skill.get("contentMarkdown", ""),
+                    "source": skill.get("source", "model_selected"),
+                }
+            )
     return None
 
 
@@ -149,9 +151,7 @@ Rules for skill loading:
     for message in request.messages:
         if message.role == "human":
             openai_messages.append(
-                ChatCompletionUserMessageParam(
-                    role="user", content=message.content
-                )
+                ChatCompletionUserMessageParam(role="user", content=message.content)
             )
         elif message.role == "ai" and isinstance(message.content, str):
             openai_messages.append(
@@ -164,8 +164,7 @@ Rules for skill loading:
     # and we haven't already attempted a skill request this turn.
     last = request.messages[-1]
     skill_already_requested = (
-        last.role == "tool"
-        and getattr(last, "function", None) == "get_skill_content"
+        last.role == "tool" and getattr(last, "function", None) == "get_skill_content"
     )
     allow_skill_loading = (
         bool(request.skills_catalog)
@@ -174,29 +173,31 @@ Rules for skill loading:
     )
     functions = []
     if allow_skill_loading:
-        functions.append({
-            "name": "get_skill_content",
-            "description": (
-                "Load the full instructions for one skill from the available "
-                "skills catalog. Use this only when one listed skill is "
-                "directly relevant to the user's request."
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "slug": {
-                        "type": "string",
-                        "description": "The exact slug of the skill to load.",
-                        "enum": [s.slug for s in request.skills_catalog or []],
+        functions.append(
+            {
+                "name": "get_skill_content",
+                "description": (
+                    "Load the full instructions for one skill from the available "
+                    "skills catalog. Use this only when one listed skill is "
+                    "directly relevant to the user's request."
+                ),
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "slug": {
+                            "type": "string",
+                            "description": "The exact slug of the skill to load.",
+                            "enum": [s.slug for s in request.skills_catalog or []],
+                        },
+                        "reason": {
+                            "type": "string",
+                            "description": "A short explanation of why this skill is needed.",
+                        },
                     },
-                    "reason": {
-                        "type": "string",
-                        "description": "A short explanation of why this skill is needed.",
-                    },
+                    "required": ["slug"],
                 },
-                "required": ["slug"],
-            },
-        })
+            }
+        )
 
     async def execution_loop() -> AsyncGenerator[dict[str, Any], None]:
         client = openai.AsyncOpenAI()

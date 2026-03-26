@@ -1,5 +1,8 @@
-import httpx
+from __future__ import annotations
+
 from collections import Counter
+
+import httpx
 
 from french_territorial_intelligence.sources.registry import registry
 
@@ -27,32 +30,26 @@ NAF_SECTIONS = {
     "S": "Other services",
 }
 
-# NAF Rev.2 division (2-digit) to section letter mapping
-_DIV_TO_SECTION: dict[int, str] = {}
-for _s, _ranges in {
-    "A": [(1, 3)],
-    "B": [(5, 9)],
-    "C": [(10, 33)],
-    "D": [(35, 35)],
-    "E": [(36, 39)],
-    "F": [(41, 43)],
-    "G": [(45, 47)],
-    "H": [(49, 53)],
-    "I": [(55, 56)],
-    "J": [(58, 63)],
-    "K": [(64, 66)],
-    "L": [(68, 68)],
-    "M": [(69, 75)],
-    "N": [(77, 82)],
-    "O": [(84, 84)],
-    "P": [(85, 85)],
-    "Q": [(86, 88)],
-    "R": [(90, 93)],
-    "S": [(94, 96)],
-}.items():
-    for _lo, _hi in _ranges:
-        for _d in range(_lo, _hi + 1):
-            _DIV_TO_SECTION[_d] = _s
+
+def _build_div_to_section() -> dict[int, str]:
+    """Build NAF Rev.2 division (2-digit) to section letter lookup."""
+    mapping: dict[int, str] = {}
+    for section, ranges in {
+        "A": [(1, 3)],   "B": [(5, 9)],   "C": [(10, 33)],
+        "D": [(35, 35)],  "E": [(36, 39)],  "F": [(41, 43)],
+        "G": [(45, 47)],  "H": [(49, 53)],  "I": [(55, 56)],
+        "J": [(58, 63)],  "K": [(64, 66)],  "L": [(68, 68)],
+        "M": [(69, 75)],  "N": [(77, 82)],  "O": [(84, 84)],
+        "P": [(85, 85)],  "Q": [(86, 88)],  "R": [(90, 93)],
+        "S": [(94, 96)],
+    }.items():
+        for lo, hi in ranges:
+            for div in range(lo, hi + 1):
+                mapping[div] = section
+    return mapping
+
+
+_DIV_TO_SECTION = _build_div_to_section()
 
 
 def _naf_to_section(naf_code: str) -> str:

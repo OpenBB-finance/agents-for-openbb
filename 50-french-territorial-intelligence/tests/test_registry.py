@@ -1,6 +1,4 @@
-import pytest
 from french_territorial_intelligence.sources.registry import registry
-from french_territorial_intelligence.sources.base import DataSource
 
 
 class FakeSource:

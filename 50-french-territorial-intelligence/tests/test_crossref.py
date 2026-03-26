@@ -1,5 +1,8 @@
-import pytest
-from french_territorial_intelligence.crossref import build_profile, compare_profiles, TerritoryProfile
+from french_territorial_intelligence.crossref import (
+    TerritoryProfile,
+    build_profile,
+    compare_profiles,
+)
 
 
 GEO_DATA = {

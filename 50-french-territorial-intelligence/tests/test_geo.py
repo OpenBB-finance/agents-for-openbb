@@ -1,6 +1,9 @@
+from unittest.mock import patch
+
 import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
+
 from french_territorial_intelligence.sources.geo import GeoSource
+from tests.conftest import mock_httpx_response, patch_httpx_client
 
 
 @pytest.fixture
@@ -23,21 +26,10 @@ GEO_RESPONSE_LIST = [
 GEO_RESPONSE_SINGLE = GEO_RESPONSE_LIST[0]
 
 
-def _mock_response(json_data, status_code=200):
-    resp = MagicMock()
-    resp.status_code = status_code
-    resp.json.return_value = json_data
-    resp.raise_for_status = MagicMock()
-    return resp
-
-
 @pytest.mark.asyncio
 async def test_fetch_territory(geo):
-    with patch("httpx.AsyncClient") as mock_client_cls:
-        mock_client = AsyncMock()
-        mock_client.get.return_value = _mock_response(GEO_RESPONSE_SINGLE)
-        mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
-        mock_client_cls.return_value.__aexit__ = AsyncMock(return_value=False)
+    with patch("httpx.AsyncClient") as mock_cls:
+        patch_httpx_client(mock_cls, mock_httpx_response(GEO_RESPONSE_SINGLE))
         result = await geo.fetch_territory("69123")
     assert result["name"] == "Lyon"
     assert result["population"] == 519127
@@ -48,11 +40,8 @@ async def test_fetch_territory(geo):
 
 @pytest.mark.asyncio
 async def test_search(geo):
-    with patch("httpx.AsyncClient") as mock_client_cls:
-        mock_client = AsyncMock()
-        mock_client.get.return_value = _mock_response(GEO_RESPONSE_LIST)
-        mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
-        mock_client_cls.return_value.__aexit__ = AsyncMock(return_value=False)
+    with patch("httpx.AsyncClient") as mock_cls:
+        patch_httpx_client(mock_cls, mock_httpx_response(GEO_RESPONSE_LIST))
         results = await geo.search("Lyon")
     assert len(results) == 1
     assert results[0]["name"] == "Lyon"

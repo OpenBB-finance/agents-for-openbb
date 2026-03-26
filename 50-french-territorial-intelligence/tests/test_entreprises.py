@@ -1,6 +1,9 @@
+from unittest.mock import patch
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+
 from french_territorial_intelligence.sources.entreprises import EntreprisesSource
+from tests.conftest import mock_httpx_response, patch_httpx_client
 
 
 @pytest.fixture
@@ -32,21 +35,10 @@ API_RESPONSE = {
 }
 
 
-def _mock_response(json_data, status_code=200):
-    resp = MagicMock()
-    resp.status_code = status_code
-    resp.json.return_value = json_data
-    resp.raise_for_status = MagicMock()
-    return resp
-
-
 @pytest.mark.asyncio
 async def test_fetch_territory(ent):
-    with patch("httpx.AsyncClient") as mock_client_cls:
-        mock_client = AsyncMock()
-        mock_client.get.return_value = _mock_response(API_RESPONSE)
-        mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
-        mock_client_cls.return_value.__aexit__ = AsyncMock(return_value=False)
+    with patch("httpx.AsyncClient") as mock_cls:
+        patch_httpx_client(mock_cls, mock_httpx_response(API_RESPONSE))
         result = await ent.fetch_territory("59378")
     assert result["total_enterprises"] == 624
     assert len(result["enterprises"]) == 1
@@ -55,11 +47,8 @@ async def test_fetch_territory(ent):
 
 @pytest.mark.asyncio
 async def test_sector_breakdown(ent):
-    with patch("httpx.AsyncClient") as mock_client_cls:
-        mock_client = AsyncMock()
-        mock_client.get.return_value = _mock_response(API_RESPONSE)
-        mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
-        mock_client_cls.return_value.__aexit__ = AsyncMock(return_value=False)
+    with patch("httpx.AsyncClient") as mock_cls:
+        patch_httpx_client(mock_cls, mock_httpx_response(API_RESPONSE))
         result = await ent.fetch_territory("59378")
     assert "sector_breakdown" in result
     assert "Manufacturing" in result["sector_breakdown"]
@@ -67,11 +56,8 @@ async def test_sector_breakdown(ent):
 
 @pytest.mark.asyncio
 async def test_search(ent):
-    with patch("httpx.AsyncClient") as mock_client_cls:
-        mock_client = AsyncMock()
-        mock_client.get.return_value = _mock_response(API_RESPONSE)
-        mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
-        mock_client_cls.return_value.__aexit__ = AsyncMock(return_value=False)
+    with patch("httpx.AsyncClient") as mock_cls:
+        patch_httpx_client(mock_cls, mock_httpx_response(API_RESPONSE))
         results = await ent.search("boulangerie")
     assert len(results) == 1
     assert results[0]["name"] == "BOULANGERIES PAUL"

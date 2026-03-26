@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import httpx
 
 from french_territorial_intelligence.sources.registry import registry

@@ -3,8 +3,8 @@
 import asyncio
 import json
 import os
+from collections.abc import AsyncGenerator
 from dataclasses import asdict
-from typing import AsyncGenerator
 
 from openai import AsyncOpenAI
 from openbb_ai import message_chunk
@@ -17,10 +17,10 @@ from french_territorial_intelligence.crossref import (
 )
 from french_territorial_intelligence.sources.registry import registry
 
-# Ensure sources are registered (side-effect imports)
-import french_territorial_intelligence.sources.geo  # noqa: F401
-import french_territorial_intelligence.sources.entreprises  # noqa: F401
+# Side-effect imports: register data sources
 import french_territorial_intelligence.sources.dvf  # noqa: F401
+import french_territorial_intelligence.sources.entreprises  # noqa: F401
+import french_territorial_intelligence.sources.geo  # noqa: F401
 
 SYSTEM_PROMPT = """You are the French Territorial Intelligence agent.
 You analyze French territories by cross-referencing open data: business registries,
@@ -105,16 +105,13 @@ async def _build_territory_profile(city_name: str) -> TerritoryProfile | None:
     commune = communes[0]
     code = commune["code"]
 
-    ent_source = registry.get("entreprises")
-    dvf_source = registry.get("dvf")
-
-    tasks = {}
-    if ent_source:
+    tasks: dict[str, object] = {}
+    if ent_source := registry.get("entreprises"):
         tasks["ent"] = ent_source.fetch_territory(code)
-    if dvf_source:
+    if dvf_source := registry.get("dvf"):
         tasks["dvf"] = dvf_source.fetch_territory(code)
 
-    results = {}
+    results: dict[str, dict] = {}
     if tasks:
         gathered = await asyncio.gather(*tasks.values(), return_exceptions=True)
         for key, result in zip(tasks.keys(), gathered):
@@ -175,7 +172,6 @@ async def stream_response(request: QueryRequest) -> AsyncGenerator[dict, None]:
     )
     choice = response.choices[0]
 
-    # Handle tool calls
     if choice.message.tool_calls:
         messages.append(choice.message.model_dump())
         for tool_call in choice.message.tool_calls:
@@ -187,7 +183,6 @@ async def stream_response(request: QueryRequest) -> AsyncGenerator[dict, None]:
                 "content": result,
             })
 
-        # Stream the final synthesis
         stream = await client.chat.completions.create(
             model="gpt-4o",
             messages=messages,
@@ -198,7 +193,5 @@ async def stream_response(request: QueryRequest) -> AsyncGenerator[dict, None]:
             delta = chunk.choices[0].delta
             if delta.content:
                 yield message_chunk(delta.content).model_dump()
-    else:
-        # Direct response (no tool needed)
-        if choice.message.content:
-            yield message_chunk(choice.message.content).model_dump()
+    elif choice.message.content:
+        yield message_chunk(choice.message.content).model_dump()

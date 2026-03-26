@@ -19,10 +19,7 @@ class SourceRegistry:
         return list(self._sources.values())
 
     def available_metrics(self) -> list[str]:
-        metrics: list[str] = []
-        for source in self._sources.values():
-            metrics.extend(source.available_metrics())
-        return metrics
+        return [m for source in self._sources.values() for m in source.available_metrics()]
 
     def clear(self) -> None:
         self._sources.clear()

@@ -35,9 +35,7 @@ def test_agents_json():
 
 def test_feedback_thumbs_up(tmp_path, monkeypatch):
     feedback_file = tmp_path / "feedback.json"
-    monkeypatch.setattr(
-        "vanilla_agent_feedback.main.FEEDBACK_FILE", feedback_file
-    )
+    monkeypatch.setattr("vanilla_agent_feedback.main.FEEDBACK_FILE", feedback_file)
 
     payload = {
         "vote": "thumbs_up",
@@ -58,9 +56,7 @@ def test_feedback_thumbs_up(tmp_path, monkeypatch):
 
 def test_feedback_thumbs_down(tmp_path, monkeypatch):
     feedback_file = tmp_path / "feedback.json"
-    monkeypatch.setattr(
-        "vanilla_agent_feedback.main.FEEDBACK_FILE", feedback_file
-    )
+    monkeypatch.setattr("vanilla_agent_feedback.main.FEEDBACK_FILE", feedback_file)
 
     payload = {
         "vote": "thumbs_down",
@@ -77,9 +73,7 @@ def test_feedback_thumbs_down(tmp_path, monkeypatch):
     entries = json.loads(feedback_file.read_text())
     assert len(entries) == 1
     assert entries[0]["vote"] == "thumbs_down"
-    assert entries[0]["tags"] == [
-        "Not factually correct / Hallucinations / Inaccurate"
-    ]
+    assert entries[0]["tags"] == ["Not factually correct / Hallucinations / Inaccurate"]
 
 
 def test_query():

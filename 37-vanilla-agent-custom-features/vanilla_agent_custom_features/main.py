@@ -52,6 +52,25 @@ def get_copilot_description():
                         "default": True,
                         "description": "Allows the copilot to search the web.",
                     },
+                    "model": {
+                        "label": "Model",
+                        "type": "select",
+                        "default": "claude-sonnet-4-20250514",
+                        "description": "Select the LLM model to use.",
+                        "options": [
+                            {"label": "Claude Opus 4", "value": "claude-opus-4-0-20250514"},
+                            {"label": "Claude Sonnet 4", "value": "claude-sonnet-4-20250514"},
+                            {"label": "GPT-4o", "value": "gpt-4o"},
+                            {"label": "GPT-4o mini", "value": "gpt-4o-mini"},
+                        ],
+                    },
+                    "agent-name": {
+                        "label": "Name of Agent",
+                        "type": "text",
+                        "default": "Example Agent",
+                        "description": "Set the name the agent uses to introduce itself.",
+                        "placeholder": "e.g. My Custom Agent",
+                    },
                 },
             }
         }
@@ -64,23 +83,37 @@ async def query(request: QueryRequest) -> EventSourceResponse:
 
     # Check workspace_options from request payload
     # workspace_options is a list like ["web-search"] or ["deep-research", "web-search"]
+    # Text/select features are sent as "key=value" entries
     workspace_options = getattr(request, "workspace_options", [])
+
+    # Helper to extract a value from "key=value" entries
+    def get_option_value(key: str, default: str = "") -> str:
+        for opt in workspace_options:
+            if opt.startswith(f"{key}="):
+                return opt.split("=", 1)[1]
+        return default
 
     # Check which features are enabled
     deep_research_enabled = "deep-research" in workspace_options
     web_search_enabled = "web-search" in workspace_options
 
+    # Read text/select feature values
+    model = get_option_value("model", "claude-sonnet-4-20250514")
+    agent_name = get_option_value("agent-name", "Example Agent")
+
     # Build the feature status message
     features_msg = (
         f"- Deep Research: {'✅ Enabled' if deep_research_enabled else '❌ Disabled'}\n"
-        f"- Web Search: {'✅ Enabled' if web_search_enabled else '❌ Disabled'}"
+        f"- Web Search: {'✅ Enabled' if web_search_enabled else '❌ Disabled'}\n"
+        f"- Model: {model}\n"
+        f"- Agent Name: {agent_name}"
     )
 
     openai_messages: list[ChatCompletionMessageParam] = [
         ChatCompletionSystemMessageParam(
             role="system",
             content=(
-                "You are a simple greeting agent.\n"
+                f'Your name is "{agent_name}".\n'
                 "Greet the user and let them know their current feature settings:\n"
                 f"{features_msg}\n"
                 "Keep your response brief and friendly."

@@ -58,8 +58,14 @@ def get_copilot_description():
                         "default": "claude-sonnet-4-20250514",
                         "description": "Select the LLM model to use.",
                         "options": [
-                            {"label": "Claude Opus 4", "value": "claude-opus-4-0-20250514"},
-                            {"label": "Claude Sonnet 4", "value": "claude-sonnet-4-20250514"},
+                            {
+                                "label": "Claude Opus 4",
+                                "value": "claude-opus-4-0-20250514",
+                            },
+                            {
+                                "label": "Claude Sonnet 4",
+                                "value": "claude-sonnet-4-20250514",
+                            },
                             {"label": "GPT-4o", "value": "gpt-4o"},
                             {"label": "GPT-4o mini", "value": "gpt-4o-mini"},
                         ],

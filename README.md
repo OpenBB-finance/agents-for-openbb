@@ -9,6 +9,7 @@ It depends heavily on the [OpenBB AI SDK](https://github.com/OpenBB-finance/open
 For documentation on how to use the OpenBB AI SDK (highly recommended!), see the [OpenBB AI SDK README](https://github.com/OpenBB-finance/openbb-ai).
 
 ## Examples
+
 If you prefer diving straight into code, we have a growing list of examples of custom agents in this repository, varying in complexity and features:
 
 - [A vanilla agent that can improve a user prompt](./financial-prompt-optimizer)

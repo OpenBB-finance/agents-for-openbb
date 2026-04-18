@@ -1,0 +1,23 @@
+[
+  {
+    "timestamp": "2026-04-13T02:22:16.124393+00:00",
+    "vote": "thumbs_up",
+    "tags": [],
+    "user_comment": "",
+    "ai_response": "Hello! How can I assist you today?",
+    "user_prompt": "Hi",
+    "trace_id": ""
+  },
+  {
+    "timestamp": "2026-04-13T02:22:40.944276+00:00",
+    "vote": "thumbs_down",
+    "tags": [
+      "Not factually correct / Hallucinations / Inaccurate",
+      "Other"
+    ],
+    "user_comment": "No!\n",
+    "ai_response": "I'm glad to hear that! What can I help you with today? If you have any questions or need assistance with financial matters, feel free to ask.",
+    "user_prompt": "cool",
+    "trace_id": ""
+  }
+]

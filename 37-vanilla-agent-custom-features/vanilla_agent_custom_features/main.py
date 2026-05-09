@@ -87,25 +87,18 @@ def get_copilot_description():
 async def query(request: QueryRequest) -> EventSourceResponse:
     """Stream a simple greeting with feature status."""
 
-    # Check workspace_options from request payload
-    # workspace_options is a list like ["web-search"] or ["deep-research", "web-search"]
-    # Text/select features are sent as "key=value" entries
-    workspace_options = getattr(request, "workspace_options", [])
-
-    # Helper to extract a value from "key=value" entries
-    def get_option_value(key: str, default: str = "") -> str:
-        for opt in workspace_options:
-            if opt.startswith(f"{key}="):
-                return opt.split("=", 1)[1]
-        return default
+    # Check workspace_options from request payload.
+    # workspace_options is a dictionary like:
+    # {"deep-research": true, "web-search": false, "model": "gpt-4o"}
+    workspace_options = getattr(request, "workspace_options", {}) or {}
 
     # Check which features are enabled
-    deep_research_enabled = "deep-research" in workspace_options
-    web_search_enabled = "web-search" in workspace_options
+    deep_research_enabled = bool(workspace_options.get("deep-research", False))
+    web_search_enabled = bool(workspace_options.get("web-search", True))
 
     # Read text/select feature values
-    model = get_option_value("model", "claude-sonnet-4-20250514")
-    agent_name = get_option_value("agent-name", "Example Agent")
+    model = workspace_options.get("model", "claude-sonnet-4-20250514")
+    agent_name = workspace_options.get("agent-name", "Example Agent")
 
     # Build the feature status message
     features_msg = (

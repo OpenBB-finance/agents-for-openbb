@@ -6,16 +6,18 @@ This is a simple example agent that demonstrates how to detect and report which 
 
 This agent:
 - Greets users with a friendly hello message
-- Reports the status of custom features (Deep Research and Web Search) 
-- Shows whether each feature is enabled (✅) or disabled (❌) based on the UI settings
+- Reports the status of custom features (Deep Research and Web Search)
+- Shows boolean, text, and select option values based on the UI settings
 
 ## Features
 
-The agent defines two custom features in its configuration:
+The agent defines four custom features in its configuration:
 - **Deep Research**: Allows the agent to perform deep research (default: disabled)
 - **Web Search**: Allows the agent to search the web (default: enabled)
+- **Model**: Selects the model value sent to the agent
+- **Agent Name**: Sets the display name the agent uses in its response
 
-Users can toggle these features on/off in the OpenBB Workspace UI, and the agent will detect and report the current status.
+Users can update these options in the OpenBB Workspace UI, and the agent will detect and report the current values from `workspace_options`.
 
 ## Getting started
 

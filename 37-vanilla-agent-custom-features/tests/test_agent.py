@@ -57,7 +57,12 @@ def test_query_with_workspace_options():
     """Test query with workspace options to verify feature detection."""
     test_payload = {
         "messages": [{"role": "human", "content": "Hello, what features are enabled?"}],
-        "workspace_options": {"deep-research": True, "web-search": False},
+        "workspace_options": {
+            "deep-research": True,
+            "web-search": False,
+            "model": "gpt-4o",
+            "agent-name": "Test Agent",
+        },
     }
 
     with mock.patch("openai.AsyncOpenAI") as mock_openai:
@@ -73,6 +78,8 @@ def test_query_with_workspace_options():
             # Check that the system message contains the feature status
             assert "Deep Research: ✅ Enabled" in system_message
             assert "Web Search: ❌ Disabled" in system_message
+            assert "Model: gpt-4o" in system_message
+            assert "Agent Name: Test Agent" in system_message
 
             # Return a mock stream
             class MockEvent:
@@ -84,7 +91,10 @@ def test_query_with_workspace_options():
 
                 choices = [Choice()]
 
-            yield MockEvent()
+            async def stream():
+                yield MockEvent()
+
+            return stream()
 
         mock_client.chat.completions.create = mock_create
 
@@ -109,6 +119,8 @@ def test_query_default_workspace_options():
             # Check that defaults are used (deep-research: False, web-search: True)
             assert "Deep Research: ❌ Disabled" in system_message
             assert "Web Search: ✅ Enabled" in system_message
+            assert "Model: claude-sonnet-4-20250514" in system_message
+            assert "Agent Name: Example Agent" in system_message
 
             # Return a mock stream
             class MockEvent:
@@ -120,7 +132,10 @@ def test_query_default_workspace_options():
 
                 choices = [Choice()]
 
-            yield MockEvent()
+            async def stream():
+                yield MockEvent()
+
+            return stream()
 
         mock_client.chat.completions.create = mock_create
 

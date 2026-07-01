@@ -8,6 +8,9 @@ It depends heavily on the [OpenBB AI SDK](https://github.com/OpenBB-finance/open
 
 For documentation on how to use the OpenBB AI SDK (highly recommended!), see the [OpenBB AI SDK README](https://github.com/OpenBB-finance/openbb-ai).
 
+> [!NOTE]
+> For a more mature OpenBB Workspace agent implementation, check out [Agent Rita](https://github.com/OpenBB-finance/agent-rita). It is built in TypeScript with Bun and is a useful reference for production-oriented agents.
+
 ## Examples
 
 If you prefer diving straight into code, we have a growing list of examples of custom agents in this repository, varying in complexity and features:
